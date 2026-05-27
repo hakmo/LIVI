@@ -109,6 +109,8 @@ jobs:
       HUSKY: 0
       ELECTRON_CACHE: .cache/electron
       ELECTRON_BUILDER_CACHE: .cache/electron-builder
+      # usb@2.17.0 binding.gyp hardcodes -std=c++14 but node-addon-api@8 uses C++17 features
+      CXXFLAGS: -std=c++17
 
     strategy:
       fail-fast: false

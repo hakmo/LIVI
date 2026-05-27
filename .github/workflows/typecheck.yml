@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 30
     env:
       HUSKY: 0
+      # usb@2.17.0 binding.gyp hardcodes -std=c++14 but node-addon-api@8 uses C++17 features
+      CXXFLAGS: -std=c++17
 
     steps:
       - uses: actions/checkout@v6
@@ -71,6 +73,8 @@ jobs:
     timeout-minutes: 30
     env:
       HUSKY: 0
+      # usb@2.17.0 binding.gyp hardcodes -std=c++14 but node-addon-api@8 uses C++17 features
+      CXXFLAGS: -std=c++17
 
     steps:
       - uses: actions/checkout@v6
