@@ -338,6 +338,9 @@ export class Session extends EventEmitter {
     msgId: number,
     payload: Buffer
   ): void {
+    // Any incoming frame counts as liveness
+    this._lastPongAt = Date.now()
+
     if (DEBUG && (TRACE || (!isFrameChannel(channelId) && !isPingPong(channelId, msgId)))) {
       const stateName =
         [

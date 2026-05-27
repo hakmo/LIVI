@@ -18,7 +18,7 @@ const SKIP_PROBE_DEVICE_CLASSES = new Set<number>([
   0x11 // Billboard (USB-C alt-mode advertising)
 ])
 
-// Suppress detach/attach noise during the AOAP handshake cycle.
+// Suppress detach/attach noise during the AOAP handshake cycle
 const PHONE_REENUM_SUPPRESS_MS = 2_500
 
 export class USBService {
