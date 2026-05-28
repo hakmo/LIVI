@@ -55,8 +55,14 @@ Window.SetBackgroundBottomColor(0, 0, 0);
 logo = Image("logo.png");
 sprite = Sprite(logo);
 
-# Center for 1920x1080 with the 512x512 source PNG
-sprite.SetPosition(704, 284, 10);
+# Re-center on every refresh; window size is 0 at init on some displays
+fun refresh() {
+  sprite.SetPosition(
+    Window.GetWidth() / 2 - logo.GetWidth() / 2,
+    Window.GetHeight() / 2 - logo.GetHeight() / 2,
+    10);
+}
+Plymouth.SetRefreshFunction(refresh);
 EOF
 
 echo "[3/5] Activating theme + rebuilding initramfs"
