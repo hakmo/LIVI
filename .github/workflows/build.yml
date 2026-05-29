@@ -189,7 +189,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
               build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev \
-              pkg-config libusb-1.0-0 libudev1 ca-certificates
+              pkg-config libusb-1.0-0 libudev1 ca-certificates \
+              libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
           sudo rm -rf /var/lib/apt/lists/*
 
       - name: Install deps (pnpm) [linux-x64]
@@ -238,7 +239,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
               build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev \
-              pkg-config libusb-1.0-0 libudev1 ca-certificates
+              pkg-config libusb-1.0-0 libudev1 ca-certificates \
+              libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
           sudo rm -rf /var/lib/apt/lists/*
 
       - name: Install deps (pnpm) [linux-arm64]
@@ -272,6 +274,26 @@ jobs:
               brew upgrade "$pkg" >/dev/null
             fi
           done
+
+      # Runtime + devel framework so node-gyp can build the gst-video addon
+      # (devel = headers + pkg-config, runtime = the dylibs to link against)
+      - name: Install GStreamer (runtime + devel) [macos-arm64]
+        if: matrix.os == 'macos' && matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          GST_VERSION=$(curl -fsSL https://gstreamer.freedesktop.org/data/pkg/osx/ \
+            | grep -oE 'href="[0-9]+\.[0-9]+\.[0-9]+/"' \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' \
+            | awk -F. '$2 % 2 == 0' \
+            | sort -V \
+            | tail -1)
+          echo "GStreamer: $GST_VERSION"
+          base="https://gstreamer.freedesktop.org/data/pkg/osx/${GST_VERSION}"
+          curl -fL -o gst-runtime.pkg "${base}/gstreamer-1.0-${GST_VERSION}-universal.pkg"
+          curl -fL -o gst-devel.pkg "${base}/gstreamer-1.0-devel-${GST_VERSION}-universal.pkg"
+          sudo installer -pkg gst-runtime.pkg -target /
+          sudo installer -pkg gst-devel.pkg -target /
 
       - name: Install deps (pnpm) [macos-arm64]
         if: matrix.os == 'macos' && matrix.arch == 'arm64'

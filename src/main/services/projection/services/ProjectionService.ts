@@ -17,6 +17,7 @@ import {
 } from '../../audio/AudioDeviceEnumerator'
 import { StatusFileWriter } from '../../status/StatusFileWriter'
 import { isCarlinkitDongle } from '../../usb/constants'
+import { GstVideo, type GstVideoCodec, probeGstCodecs } from '../../video/GstVideo'
 import { AaBtSockClient } from '../driver/aa/AaBtSockClient'
 import { AaBluetoothSupervisor } from '../driver/aa/aaBluetoothSupervisor'
 import { AaDriver } from '../driver/aa/aaDriver'
@@ -131,6 +132,9 @@ export class ProjectionService {
   private firstFrameLogged = false
   private lastVideoWidth?: number
   private lastVideoHeight?: number
+  private gstVideo: GstVideo | null = null
+  private gstVideoCodec: GstVideoCodec = 'h264'
+  private gstVideoVisible = true
   private dongleFwVersion?: string
   private boxInfo?: unknown
   private hostDevList: DevListEntry[] = []
@@ -571,7 +575,7 @@ export class ProjectionService {
         })
       }
 
-      this.sendChunked('projection-video-chunk', msg.data?.buffer as ArrayBuffer, 512 * 1024)
+      if (msg.data) this.pushGstVideo(msg.data)
     } else if (msg instanceof AudioData) {
       this.audio.handleAudioData(msg)
 
@@ -719,11 +723,28 @@ export class ProjectionService {
     this.pendingStartupConnectTarget = null
   }
 
-  // 'video-codec' — phone announces which advertised codec it picked.
+  // 'video-codec' — phone announces which advertised codec it picked
   private readonly onDriverVideoCodec = (codec: 'h264' | 'h265' | 'vp9' | 'av1'): void => {
+    this.gstVideoCodec = codec
     const wc = this.webContents
     if (!wc || wc.isDestroyed?.()) return
     wc.send('projection-event', { type: 'video-codec', payload: { codec } })
+  }
+
+  private pushGstVideo(nal: Buffer): void {
+    const wc = this.webContents
+    if (!wc || wc.isDestroyed?.()) return
+    if (!this.gstVideo) {
+      this.gstVideo = new GstVideo(wc)
+      this.gstVideo.setVisible(this.gstVideoVisible)
+    }
+    this.gstVideo.push(this.gstVideoCodec, nal)
+  }
+
+  // Renderer reports whether the projection screen is currently shown
+  public setVideoVisible(visible: boolean): void {
+    this.gstVideoVisible = visible
+    this.gstVideo?.setVisible(visible)
   }
 
   // Cluster channel codec selection
@@ -820,6 +841,7 @@ export class ProjectionService {
       start: () => this.start(),
       stop: () => this.stop(),
       restartSession: () => this.restartSession(),
+      setVideoVisible: (v) => this.setVideoVisible(v),
       pickPreferredTransport: () => this.pickPreferredTransport(),
       switchTransport: () => this.switchTransport(),
       getTransportState: () => this.getTransportState(),
@@ -865,6 +887,29 @@ export class ProjectionService {
     this.audioMonitor = startAudioDeviceMonitor(() => {
       this.emitProjectionEvent({ type: 'audioDevicesChanged' })
     })
+
+    this.applyGstCodecCaps()
+  }
+
+  // Advertise the codecs the bundled GStreamer can decode. Optional codecs are
+  // offered only when a HW decoder exists, h264 is the always-on AA baseline
+  private applyGstCodecCaps(): void {
+    const p = probeGstCodecs()
+    const hwCap = (s: { hw: boolean }): { hw?: unknown; sw?: unknown } | undefined =>
+      s.hw ? { hw: true, sw: true } : undefined
+    this.lastCodecCaps = {
+      h264: { hw: true, sw: true },
+      h265: hwCap(p.h265),
+      vp9: hwCap(p.vp9),
+      av1: hwCap(p.av1)
+    }
+    console.log(
+      `[ProjectionService] GStreamer codecs: ` +
+        `h265(av=${p.h265.available} hw=${p.h265.hw}) ` +
+        `vp9(av=${p.vp9.available} hw=${p.vp9.hw}) ` +
+        `av1(av=${p.av1.available} hw=${p.av1.hw})`
+    )
+    this.recomputeCodecCapabilities()
   }
 
   private async reloadConfigFromDisk(): Promise<void> {
@@ -1686,6 +1731,10 @@ export class ProjectionService {
 
       this.webUsbDevice = null
       this.audio.resetForSessionStop()
+
+      this.gstVideo?.dispose()
+      this.gstVideo = null
+      this.gstVideoCodec = 'h264'
 
       this.started = false
       this.resetMediaSnapshot('session-stop')

@@ -1,13 +1,6 @@
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
 import { Box, Typography, useTheme } from '@mui/material'
 import { aaContentArea } from '@shared/utils'
-import { createRenderWorker } from '@worker/createRenderWorker'
-import {
-  InitEvent,
-  SetCodecEvent,
-  UpdateHwAccelEvent,
-  type VideoCodec
-} from '@worker/render/RenderEvents'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiviStore, useStatusStore } from '../../../store/store'
 
@@ -45,41 +38,13 @@ export const Cluster: React.FC<ClusterProps> = ({ visible }) => {
   const isStreaming = useStatusStore((s) => s.isStreaming)
   const isAaActive = useStatusStore((s) => s.isAaActive)
 
-  const initialFpsRef = useRef<number | undefined>(settings?.clusterFps)
-  if (initialFpsRef.current === undefined) {
-    const f = settings?.clusterFps
-    if (typeof f === 'number' && f > 0) initialFpsRef.current = f
-  }
-
-  const [renderReady, setRenderReady] = useState(false)
-  const [rendererError, setRendererError] = useState<string | null>(null)
+  const [renderReady] = useState(false)
+  const [rendererError] = useState<string | null>(null)
   const [clusterStreamActive, setClusterStreamActive] = useState(false)
   const [clusterFrameSize, setClusterFrameSize] = useState<{ w: number; h: number } | null>(null)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const renderWorkerRef = useRef<Worker | null>(null)
-  const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null)
-  const clusterCodecRef = useRef<VideoCodec>('h264')
-
-  const clusterVideoChannel = useMemo(() => new MessageChannel(), [])
-
-  // Render.worker message typing
-  type RenderWorkerMsg =
-    | { type: 'render-ready' }
-    | { type: 'render-error'; message?: string }
-    | { type: string; [key: string]: unknown }
-
-  function isRecord(v: unknown): v is Record<string, unknown> {
-    return typeof v === 'object' && v !== null
-  }
-
-  const readWorkerMsg = React.useCallback((data: unknown): RenderWorkerMsg | null => {
-    if (!isRecord(data)) return null
-    const t = data.type
-    if (typeof t !== 'string') return null
-    return data as RenderWorkerMsg
-  }, [])
 
   const supportsNaviScreen = useMemo(() => {
     // AA-native exposes a cluster sink (ch=19, display_type=CLUSTER) when any cluster display is active
@@ -137,144 +102,6 @@ export const Cluster: React.FC<ClusterProps> = ({ visible }) => {
     return unsubscribe
   }, [renderReady, wantCluster])
 
-  // Init Render.worker
-  useEffect(() => {
-    const targetFps = initialFpsRef.current
-    if (typeof targetFps !== 'number' || targetFps <= 0) return
-
-    if (!canvasRef.current) return
-    if (offscreenCanvasRef.current || renderWorkerRef.current) return
-
-    offscreenCanvasRef.current = canvasRef.current.transferControlToOffscreen()
-
-    const w = createRenderWorker()
-    renderWorkerRef.current = w
-
-    w.postMessage(
-      new InitEvent(
-        offscreenCanvasRef.current,
-        clusterVideoChannel.port2,
-        targetFps,
-        clusterCodecRef.current,
-        Boolean(settings?.hwAcceleration)
-      ),
-      [offscreenCanvasRef.current, clusterVideoChannel.port2]
-    )
-
-    return () => {
-      renderWorkerRef.current?.terminate()
-      renderWorkerRef.current = null
-      offscreenCanvasRef.current = null
-      setRenderReady(false)
-    }
-  }, [clusterVideoChannel])
-
-  useEffect(() => {
-    if (!renderWorkerRef.current) return
-    renderWorkerRef.current.postMessage(new UpdateHwAccelEvent(Boolean(settings?.hwAcceleration)))
-  }, [settings?.hwAcceleration])
-
-  // Render.worker ready/error messages
-  useEffect(() => {
-    const w = renderWorkerRef.current
-    if (!w) return
-
-    const handler = (ev: MessageEvent<unknown>) => {
-      const msg = readWorkerMsg(ev.data)
-      const t = msg?.type
-
-      if (t === 'render-ready') {
-        setRenderReady(true)
-        setRendererError(null)
-        console.log('[MAPS] Render worker ready message received')
-        return
-      }
-
-      if (t === 'awaiting-keyframe' || t === 'request-keyframe') {
-        if (wantCluster) {
-          void window.projection.ipc.requestCluster(true).catch(() => {})
-        }
-        return
-      }
-
-      if (t === 'render-error') {
-        const message = msg && typeof msg.message === 'string' ? msg.message.trim() : ''
-        const text = message ? message : 'No renderer available'
-        setRendererError(text)
-        setRenderReady(false)
-        w.postMessage({ type: 'clear' })
-      }
-    }
-
-    w.addEventListener('message', handler)
-    return () => w.removeEventListener('message', handler)
-  }, [readWorkerMsg, wantCluster])
-
-  // resize
-  useEffect(() => {
-    const w = renderWorkerRef.current
-    const el = rootRef.current
-    if (!w || !el) return
-
-    const poke = () => {
-      w.postMessage({ type: 'frame' })
-    }
-
-    // do one immediately
-    poke()
-
-    const ro = new ResizeObserver(poke)
-    ro.observe(el)
-
-    document.addEventListener('fullscreenchange', poke)
-    window.addEventListener('resize', poke)
-
-    return () => {
-      ro.disconnect()
-      document.removeEventListener('fullscreenchange', poke)
-      window.removeEventListener('resize', poke)
-    }
-  }, [renderReady])
-
-  // Listen for cluster-video-codec events to switch the worker's parser
-  useEffect(() => {
-    const handler = (_evt: unknown, ...args: unknown[]) => {
-      const d = args[0] as { type?: string; payload?: { codec?: unknown } } | undefined
-      if (d?.type !== 'cluster-video-codec') return
-      const codec = d.payload?.codec
-      console.debug(`[MAPS] cluster-video-codec event received: codec=${codec}`)
-      if (codec === 'h264' || codec === 'h265' || codec === 'vp9' || codec === 'av1') {
-        if (codec !== clusterCodecRef.current) {
-          console.log(`[MAPS] switching worker codec ${clusterCodecRef.current} → ${codec}`)
-          clusterCodecRef.current = codec
-          renderWorkerRef.current?.postMessage(new SetCodecEvent(codec))
-        }
-      }
-    }
-    const unsubscribe = window.projection.ipc.onEvent(handler)
-    return unsubscribe
-  }, [])
-
-  // Forward video chunks to Render.worker port. Register only once the
-  // worker is ready so the initial SPS+IDR isn't dropped while it's still
-  // spinning up — preload queues chunks until the handler is attached.
-  useEffect(() => {
-    if (!renderReady || rendererError) return
-    const handleVideo = (payload: unknown) => {
-      if (!payload || typeof payload !== 'object') return
-
-      const m = payload as { chunk?: { buffer?: ArrayBuffer } }
-      const buf = m.chunk?.buffer
-      if (!buf) return
-
-      if (!clusterStreamActive) setClusterStreamActive(true)
-      clusterVideoChannel.port1.postMessage(buf, [buf])
-    }
-
-    window.projection.ipc.onClusterVideoChunk(handleVideo)
-    return () => {}
-  }, [clusterVideoChannel, renderReady, rendererError, clusterStreamActive])
-
   // Track the negotiated cluster frame dims so the canvas crop math below
   // matches whatever tier the phone actually picked.
   useEffect(() => {
@@ -295,11 +122,6 @@ export const Cluster: React.FC<ClusterProps> = ({ visible }) => {
       const msg = (args[0] ?? {}) as { type?: string }
       if (msg.type !== 'unplugged' && msg.type !== 'failure') return
       setClusterStreamActive(false)
-      clusterCodecRef.current = 'h264'
-      try {
-        renderWorkerRef.current?.postMessage(new SetCodecEvent('h264'))
-        renderWorkerRef.current?.postMessage({ type: 'reset' })
-      } catch {}
       void window.projection.ipc.requestCluster(false).catch(() => {})
     }
     const unsubscribe = window.projection.ipc.onEvent(handler)

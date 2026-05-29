@@ -141,6 +141,12 @@ $libs = @(
   "gsttag-1.0-0.dll",
   "gstfft-1.0-0.dll",
   "gstvideo-1.0-0.dll",
+  "gstcodecparsers-1.0-0.dll",
+  "gstcodecs-1.0-0.dll",
+  "gstd3d11-1.0-0.dll",
+  "gstgl-1.0-0.dll",
+  "gstcontroller-1.0-0.dll",
+  "graphene-1.0-0.dll",
   "glib-2.0-0.dll",
   "gobject-2.0-0.dll",
   "gmodule-2.0-0.dll",
@@ -172,7 +178,12 @@ foreach ($lib in $optionalLibs) {
 
 # plugins
 $plugins = @(
+  # core
   "gstapp.dll",
+  "gstcoreelements.dll",
+  "gsttypefindfunctions.dll",
+  "gstautodetect.dll",
+  # audio
   "gstaudioconvert.dll",
   "gstaudiofx.dll",
   "gstaudiomixer.dll",
@@ -180,15 +191,19 @@ $plugins = @(
   "gstaudiorate.dll",
   "gstaudioresample.dll",
   "gstaudiotestsrc.dll",
-  "gstautodetect.dll",
-  "gstcoreelements.dll",
   "gstequalizer.dll",
   "gstinterleave.dll",
   "gstlevel.dll",
   "gstrawparse.dll",
   "gstvolume.dll",
   "gstwasapi.dll",
-  "gstdirectsound.dll"
+  "gstdirectsound.dll",
+  # video parse + scale + GL sink
+  "gstvideoparsersbad.dll",
+  "gstvideoconvertscale.dll",
+  "gstopengl.dll",
+  # video HW decode + sink (Direct3D 11)
+  "gstd3d11.dll"
 )
 
 foreach ($plugin in $plugins) {

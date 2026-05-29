@@ -1,3 +1,5 @@
+packages:
+  - native/gst-video
 allowBuilds:
   electron-winstaller: true
   esbuild: true

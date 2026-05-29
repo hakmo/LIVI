@@ -35,6 +35,7 @@ export interface ProjectionIpcHost {
   start(): Promise<void>
   stop(): Promise<void>
   restartSession(): Promise<void>
+  setVideoVisible(visible: boolean): void
   pickPreferredTransport(): Transport | null
   switchTransport(): Promise<{ ok: boolean; active: Transport | null }>
   getTransportState(): TransportSnapshot

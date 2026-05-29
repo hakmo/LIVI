@@ -9,10 +9,6 @@ jest.mock('@worker/createProjectionWorker', () => ({
   createProjectionWorker: jest.fn()
 }))
 
-jest.mock('@worker/createRenderWorker', () => ({
-  createRenderWorker: jest.fn()
-}))
-
 type AnyFn = (...args: any[]) => any
 
 const statusState: Record<string, any> = {
@@ -132,10 +128,8 @@ describe('Projection page', () => {
     statusState.setDongleConnected.mockClear()
 
     const { createProjectionWorker } = jest.requireMock('@worker/createProjectionWorker')
-    const { createRenderWorker } = jest.requireMock('@worker/createRenderWorker')
 
     createProjectionWorker.mockImplementation(() => new MockWorker('projection'))
-    createRenderWorker.mockImplementation(() => new MockWorker('render'))
     ;(global as any).Worker = MockWorker
     ;(global as any).MessageChannel = MockMessageChannel
     ;(global as any).ResizeObserver = jest.fn(() => ({
@@ -152,8 +146,7 @@ describe('Projection page', () => {
         start: jest.fn().mockResolvedValue(undefined),
         stop: jest.fn().mockResolvedValue(undefined),
         sendFrame: jest.fn().mockResolvedValue(undefined),
-        onVideoChunk: jest.fn(),
-        offVideoChunk: jest.fn(),
+        setVisible: jest.fn().mockResolvedValue(undefined),
         onAudioChunk: jest.fn(),
         offAudioChunk: jest.fn(),
         onEvent: jest.fn((cb: AnyFn) => (onEventCb = cb)),
@@ -196,45 +189,16 @@ describe('Projection page', () => {
     expect(liviState.resetInfo).toHaveBeenCalled()
   })
 
-  test('handles render-ready', () => {
-    render(<Projection {...baseProps()} />)
-
-    const renderWorker = MockWorker.instances[1]
-
-    act(() => {
-      renderWorker.emit({ type: 'render-ready' })
-    })
-
-    expect(renderWorker.postMessage).not.toHaveBeenCalledWith({ type: 'clear' })
-  })
-
-  test('handles render-error', () => {
-    const setReceivingVideo = jest.fn()
-
-    render(<Projection {...baseProps({ setReceivingVideo })} receivingVideo />)
-
-    const renderWorker = MockWorker.instances[1]
-
-    act(() => {
-      renderWorker.emit({ type: 'render-error', message: 'fail' })
-    })
-
-    expect(setReceivingVideo).toHaveBeenCalledWith(false)
-  })
-
-  test('forces video hidden and clears render worker when streaming becomes false', () => {
+  test('forces video hidden when streaming becomes false', () => {
     const setReceivingVideo = jest.fn()
 
     const { rerender } = render(<Projection {...baseProps({ setReceivingVideo })} receivingVideo />)
-
-    const renderWorker = MockWorker.instances[1]
 
     statusState.isStreaming = false
 
     rerender(<Projection {...baseProps({ setReceivingVideo })} receivingVideo />)
 
     expect(setReceivingVideo).toHaveBeenCalledWith(false)
-    expect(renderWorker.postMessage).toHaveBeenCalledWith({ type: 'clear' })
   })
 
   test('handles worker failure and schedules retry timer', () => {
@@ -1079,74 +1043,6 @@ describe('Projection page', () => {
     })
 
     expect(liviState.boxInfo).toMatchObject({ preserved: true })
-  })
-
-  // ── handleVideo: all branches ─────────────────────────────────────────────
-
-  test('handleVideo forwards valid buffer to video channel port', () => {
-    render(<Projection {...baseProps()} />)
-
-    const ipc = (window as any).projection.ipc
-
-    // Trigger render-ready → new handleVideo closure registered
-    act(() => {
-      MockWorker.instances[1]?.emit({ type: 'render-ready' })
-    })
-
-    // Get the latest registered callback (re-registered after render-ready)
-    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
-
-    const buf = new ArrayBuffer(8)
-
-    act(() => {
-      videoChunkFn?.({ chunk: { buffer: buf } })
-    })
-
-    // videoChannel.port1 is MockMessageChannel.instances[0].port1 (video channel is first)
-    const port1 = MockMessageChannel.instances[0]?.port1
-    expect(port1?.postMessage).toHaveBeenCalledWith(buf, [buf])
-  })
-
-  test('handleVideo skips when rendererError is set', () => {
-    const setReceivingVideo = jest.fn()
-    render(<Projection {...baseProps({ setReceivingVideo })} />)
-
-    const ipc = (window as any).projection.ipc
-
-    // Trigger render-error → rendererError state set, new handleVideo registered
-    act(() => {
-      MockWorker.instances[1]?.emit({ type: 'render-error', message: 'gpu fail' })
-    })
-
-    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
-    const port1 = MockMessageChannel.instances[0]?.port1
-    const callsBefore = port1?.postMessage.mock.calls.length ?? 0
-
-    act(() => {
-      videoChunkFn?.({ chunk: { buffer: new ArrayBuffer(4) } })
-    })
-
-    expect(port1?.postMessage.mock.calls.length).toBe(callsBefore)
-  })
-
-  test('handleVideo ignores non-object payload', () => {
-    render(<Projection {...baseProps()} />)
-
-    const ipc = (window as any).projection.ipc
-    act(() => {
-      MockWorker.instances[1]?.emit({ type: 'render-ready' })
-    })
-
-    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
-    const port1 = MockMessageChannel.instances[0]?.port1
-
-    act(() => {
-      videoChunkFn?.(null)
-      videoChunkFn?.('string')
-      videoChunkFn?.({ chunk: {} }) // object but no buffer
-    })
-
-    expect(port1?.postMessage).not.toHaveBeenCalled()
   })
 
   // ── handleAudio: PCM conversion ───────────────────────────────────────────

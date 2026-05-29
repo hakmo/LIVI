@@ -40,7 +40,11 @@ is_system_excluded() {
     */libpulse.so.*|*/libpulsecommon-*.so|*/libasound.so.*|\
     */libglib-2.0.so.*|*/libgobject-2.0.so.*|*/libgio-2.0.so.*|*/libgmodule-2.0.so.*|\
     */libdbus-1.so.*|*/libsystemd.so.*|\
-    */libX*.so.*|*/libxcb*.so.*|*/libwayland-*.so.*)
+    */libX*.so.*|*/libxcb*.so.*|*/libwayland-*.so.*|\
+    */libdrm.so.*|*/libgbm.so.*|*/libGL.so.*|*/libEGL.so.*|*/libGLESv2.so.*|\
+    */libGLdispatch.so.*|*/libOpenGL.so.*|*/libglapi.so.*|*/libgallium*.so.*|\
+    */libva.so.*|*/libva-drm.so.*|*/libva-x11.so.*|*/libv4l2.so.*|*/libv4lconvert.so.*|\
+    */libvulkan.so.*|*/libudev.so.*|*/libgudev-1.0.so.*)
       return 0
       ;;
     *)
@@ -115,6 +119,23 @@ copy_plugin_and_deps() {
   local name="${2:-$(basename "$src")}"
 
   copy_required "$src" "$OUT/lib/gstreamer-1.0/$name"
+
+  while read -r dep; do
+    queue_dep "$dep"
+  done < <(scan_deps "$src")
+}
+
+# HW-specific plugins (v4l2/kms/va)
+copy_plugin_optional_and_deps() {
+  local src="$1"
+  local name="${2:-$(basename "$src")}"
+
+  if [[ ! -e "$src" ]]; then
+    echo "skip optional plugin: $src" >&2
+    return 0
+  fi
+
+  cp -p "$src" "$OUT/lib/gstreamer-1.0/$name"
 
   while read -r dep; do
     queue_dep "$dep"
@@ -261,7 +282,12 @@ if [[ -n "$SCANNER" ]]; then
 fi
 
 plugins=(
+  # core
   libgstapp.so
+  libgstcoreelements.so
+  libgsttypefindfunctions.so
+  libgstautodetect.so
+  # audio
   libgstaudioconvert.so
   libgstaudiofx.so
   libgstaudiomixer.so
@@ -269,8 +295,6 @@ plugins=(
   libgstaudiorate.so
   libgstaudioresample.so
   libgstaudiotestsrc.so
-  libgstautodetect.so
-  libgstcoreelements.so
   libgstequalizer.so
   libgstinterleave.so
   libgstlevel.so
@@ -278,10 +302,27 @@ plugins=(
   libgstvolume.so
   libgstpulseaudio.so
   libgstalsa.so
+  # video parse + scale + GL sink (cross-platform)
+  libgstvideoparsersbad.so
+  libgstvideoconvertscale.so
+  libgstopengl.so
 )
 
 for plugin in "${plugins[@]}"; do
   copy_plugin_and_deps "$PLUGIN_DIR/$plugin"
+done
+
+# video HW decode + DRM/KMS sink — host-dependent
+optional_plugins=(
+  libgstvideo4linux2.so  # v4l2h264dec/v4l2h265dec (Pi 4 stateful M2M)
+  libgstv4l2codecs.so    # v4l2slh264dec/v4l2slh265dec (Pi 5 stateless HEVC)
+  libgstkms.so           # kmssink (DRM overlay plane, kiosk)
+  libgstva.so            # vah264dec/vah265dec (x86 VA-API)
+  libgstwaylandsink.so   # waylandsink (wlroots/cage)
+)
+
+for plugin in "${optional_plugins[@]}"; do
+  copy_plugin_optional_and_deps "$PLUGIN_DIR/$plugin"
 done
 
 # All libs

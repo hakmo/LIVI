@@ -6,14 +6,6 @@ import { PhoneType } from '@shared/types/Config'
 import { AudioCommand, CommandMapping } from '@shared/types/ProjectionEnums'
 import { aaContentArea } from '@shared/utils'
 import { createProjectionWorker } from '@worker/createProjectionWorker'
-import { createRenderWorker } from '@worker/createRenderWorker'
-import {
-  InitEvent,
-  SetCodecEvent,
-  UpdateFpsEvent,
-  UpdateHwAccelEvent,
-  type VideoCodec
-} from '@worker/render/RenderEvents'
 import type { KeyCommand, ProjectionWorker, UsbEvent, WorkerToUI } from '@worker/types'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -131,6 +123,15 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     void window.projection.ipc.sendFrame().catch(() => {})
   }, [pathname, isDongleConnected])
 
+  // Tell main when the projection surface is shown/hidden so the native
+  // GStreamer video can be shown over the UI or hidden behind it
+  useEffect(() => {
+    const visible = pathname === '/' || navVideoOverlayActive
+    void window.projection.ipc.setVisible(visible).catch(() => {})
+    document.documentElement.classList.toggle('video-on', visible)
+    return () => document.documentElement.classList.remove('video-on')
+  }, [pathname, navVideoOverlayActive])
+
   useEffect(() => {
     const mode = isAaActiveFlag ? 'AA' : 'dongle'
     console.log(`[PROJECTION] phone connected (${mode}):`, isDongleConnected)
@@ -143,13 +144,11 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const usbOpTokenRef = useRef(0)
   const hasStartedRef = useRef(false)
-  const [renderReady, setRenderReady] = useState(false)
-  const [rendererError, setRendererError] = useState<string | null>(null)
+  const [rendererError] = useState<string | null>(null)
   const lastNonCarplayPathRef = useRef<string | null>(null)
   const lastNonClusterPathRef = useRef<string | null>(null)
   const autoSwitchedRef = useRef(false)
   const pendingVideoFocusRef = useRef(false)
-  const streamingFromChunkRef = useRef(false)
 
   const autoSwitchOnStreamRef = useRef(Boolean(settings.autoSwitchOnStream))
   const autoSwitchOnGuidanceRef = useRef(Boolean(settings.autoSwitchOnGuidance))
@@ -288,21 +287,10 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     }
   }, [])
 
-  // Render worker + OffscreenCanvas
-  const renderWorkerRef = useRef<Worker | null>(null)
-  const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null)
-
-  // keep initial FPS for worker init
-  const initialFpsRef = useRef(settings.fps)
-
-  // Codec chosen by the phone via AA START_INDICATION
-  const videoCodecRef = useRef<VideoCodec>('h264')
-
   // Visual delay for FFT so spectrum matches audio playback
   const fftVisualDelayMs = 0
 
   // Channels
-  const videoChannel = useMemo(() => new MessageChannel(), [])
   const audioChannel = useMemo(() => new MessageChannel(), [])
 
   // Projection worker setup
@@ -324,147 +312,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     )
     return w
   }, [audioChannel])
-
-  // Render worker setup
-  useEffect(() => {
-    if (canvasRef.current && !offscreenCanvasRef.current && !renderWorkerRef.current) {
-      offscreenCanvasRef.current = canvasRef.current.transferControlToOffscreen()
-      const w = createRenderWorker()
-      renderWorkerRef.current = w
-
-      const targetFps = initialFpsRef.current
-
-      w.postMessage(
-        new InitEvent(
-          offscreenCanvasRef.current,
-          videoChannel.port2,
-          targetFps,
-          videoCodecRef.current,
-          Boolean(settings?.hwAcceleration)
-        ),
-        [offscreenCanvasRef.current, videoChannel.port2]
-      )
-    }
-    // Cleanup when canvas is unmounted
-    return () => {
-      renderWorkerRef.current?.terminate()
-      renderWorkerRef.current = null
-      offscreenCanvasRef.current = null
-    }
-  }, [videoChannel])
-
-  useEffect(() => {
-    if (!renderWorkerRef.current) return
-    renderWorkerRef.current.postMessage(new UpdateFpsEvent(settings.fps))
-  }, [settings.fps])
-
-  useEffect(() => {
-    if (!renderWorkerRef.current) return
-    renderWorkerRef.current.postMessage(new UpdateHwAccelEvent(Boolean(settings?.hwAcceleration)))
-  }, [settings?.hwAcceleration])
-
-  useEffect(() => {
-    const w = renderWorkerRef.current
-    if (!w) return
-
-    type RenderWorkerMsg =
-      | { type: 'render-ready' }
-      | { type: 'render-error'; message?: string }
-      | { type: 'request-keyframe' }
-      | { type: 'awaiting-keyframe' }
-      | { type: 'streaming' }
-      | { type: string; [key: string]: unknown }
-
-    const isRecord = (v: unknown): v is Record<string, unknown> =>
-      typeof v === 'object' && v !== null
-
-    const readWorkerMsg = (data: unknown): RenderWorkerMsg | null => {
-      if (!isRecord(data)) return null
-      const t = data.type
-      if (typeof t !== 'string') return null
-      return data as RenderWorkerMsg
-    }
-
-    const handler = (ev: MessageEvent<unknown>) => {
-      const msg = readWorkerMsg(ev.data)
-      const t = msg?.type
-
-      if (t === 'render-ready') {
-        console.log('[PROJECTION] Render worker ready message received')
-        setRenderReady(true)
-        setRendererError(null)
-        return
-      }
-
-      if (t === 'request-keyframe') {
-        // The render worker tore down its decoder (resolution change or error)
-        // and now needs a fresh SPS+IDR to re-init
-        void window.projection.ipc.sendFrame().catch(() => {})
-        return
-      }
-
-      if (t === 'awaiting-keyframe') {
-        // Worker has reset its decoder and is waiting for a new keyframe
-        setStreaming(false)
-        setReceivingVideo(false)
-        return
-      }
-
-      if (t === 'streaming') {
-        // Worker decoded its first frame after init/reset
-        setStreaming(true)
-        setReceivingVideo(true)
-        return
-      }
-
-      if (t === 'render-error') {
-        const message = msg && typeof msg.message === 'string' ? msg.message.trim() : ''
-        const text = message ? message : 'No renderer available'
-
-        console.warn('[PROJECTION] Render worker error:', msg)
-
-        setRendererError(text)
-        setRenderReady(false)
-        setReceivingVideo(false)
-        w.postMessage({ type: 'clear' })
-      }
-
-      if (t === 'codec-capabilities') {
-        const caps = (msg as { capabilities?: unknown }).capabilities
-        console.debug('[Projection] codec-capabilities from worker:', caps)
-        if (caps && typeof caps === 'object') {
-          window.projection.ipc
-            .reportCodecCapabilities(caps)
-            .then(() => console.debug('[Projection] reportCodecCapabilities → ok'))
-            .catch((e) => console.error('[Projection] reportCodecCapabilities → error', e))
-        }
-      }
-    }
-
-    w.addEventListener('message', handler)
-    return () => w.removeEventListener('message', handler)
-  }, [setReceivingVideo])
-
-  // Forward video chunks to Render.worker port. Register only once the
-  // worker is ready so the initial SPS+IDR isn't dropped while it's still
-  // spinning up — preload queues chunks until the handler is attached.
-  useEffect(() => {
-    if (!renderReady || rendererError) return
-    const handleVideo = (payload: unknown) => {
-      if (!payload || typeof payload !== 'object') return
-      const m = payload as { chunk?: { buffer?: ArrayBuffer } }
-      const buf = m.chunk?.buffer
-      if (!buf) return
-      videoChannel.port1.postMessage(buf, [buf])
-      if (!streamingFromChunkRef.current) {
-        streamingFromChunkRef.current = true
-        setStreaming(true)
-        setReceivingVideo(true)
-      }
-    }
-    window.projection.ipc.onVideoChunk(handleVideo)
-    return () => window.projection.ipc.offVideoChunk(handleVideo)
-  }, [videoChannel, renderReady, rendererError, setStreaming, setReceivingVideo])
 
   // Forward audio chunks to FFT
   useEffect(() => {
@@ -519,7 +366,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   const applyAttention = useCallback(
     (p: AttentionPayload) => {
-      const inCarplay = location.pathname === '/'
+      const inProjection = location.pathname === '/'
 
       if (p.kind !== 'call' && p.kind !== 'voiceAssistant') return
 
@@ -528,7 +375,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         if (p.kind === 'voiceAssistant') clearVoiceAssistantReleaseTimer()
 
         // Already on projection -> nothing to do
-        if (inCarplay) {
+        if (inProjection) {
           attentionSwitchedByRef.current = null
           return
         }
@@ -670,7 +517,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
       setStreaming(false)
       setDongleConnected(false)
       hasStartedRef.current = false
-      streamingFromChunkRef.current = false
       resetInfo()
       await window.projection.ipc.stop()
 
@@ -761,17 +607,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         }
         case 'audioDevicesChanged': {
           bumpAudioDevicesRevision()
-          break
-        }
-        case 'video-codec': {
-          const payload = d.payload as { codec?: unknown } | undefined
-          const codec = payload?.codec
-          if (codec === 'h264' || codec === 'h265' || codec === 'vp9' || codec === 'av1') {
-            if (codec !== videoCodecRef.current) {
-              videoCodecRef.current = codec
-              renderWorkerRef.current?.postMessage(new SetCodecEvent(codec))
-            }
-          }
           break
         }
         case 'resolution': {
@@ -971,16 +806,8 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           setAaActive(false)
           setDongleConnected(false)
           setReceivingVideo(false)
-          streamingFromChunkRef.current = false
           pendingVideoFocusRef.current = false
           setNavVideoOverlayActive(false)
-          videoCodecRef.current = 'h264'
-          try {
-            renderWorkerRef.current?.postMessage(new SetCodecEvent('h264'))
-            renderWorkerRef.current?.postMessage({ type: 'reset' })
-          } catch {
-            /* worker not yet alive — no frame to clear */
-          }
           break
         }
 
@@ -989,16 +816,8 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           setAaActive(false)
           setDongleConnected(false)
           setReceivingVideo(false)
-          streamingFromChunkRef.current = false
           pendingVideoFocusRef.current = false
           setNavVideoOverlayActive(false)
-          videoCodecRef.current = 'h264'
-          try {
-            renderWorkerRef.current?.postMessage(new SetCodecEvent('h264'))
-            renderWorkerRef.current?.postMessage({ type: 'reset' })
-          } catch {
-            /* worker not yet alive */
-          }
           break
         }
       }
@@ -1061,8 +880,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         canvasRef.current.style.width = '0'
         canvasRef.current.style.height = '0'
       }
-      renderWorkerRef.current?.postMessage({ type: 'clear' })
-      streamingFromChunkRef.current = false
     }
   }, [isStreaming, setReceivingVideo])
 
@@ -1070,8 +887,8 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   const mode: 'dongle' | 'phone' = !isDongleConnected ? 'dongle' : 'phone'
 
-  const inCarplay = pathname === '/'
-  const showCarplayOverlay = inCarplay || navVideoOverlayActive
+  const inProjection = pathname === '/'
+  const showProjectionOverlay = inProjection || navVideoOverlayActive
 
   const resolvedNegotiatedWidth = negotiatedWidth ?? 0
   const resolvedNegotiatedHeight = negotiatedHeight ?? 0
@@ -1130,11 +947,11 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         width: '100%',
         height: '100%',
         touchAction: 'none',
-        visibility: showCarplayOverlay ? 'visible' : 'hidden',
-        opacity: showCarplayOverlay ? 1 : 0,
+        visibility: showProjectionOverlay ? 'visible' : 'hidden',
+        opacity: showProjectionOverlay ? 1 : 0,
         transition: 'opacity 120ms ease',
-        pointerEvents: inCarplay && isStreaming ? 'auto' : 'none',
-        zIndex: showCarplayOverlay ? 999 : -1
+        pointerEvents: inProjection && isStreaming ? 'auto' : 'none',
+        zIndex: showProjectionOverlay ? 999 : -1
       }}
     >
       {pathname === '/' && (
@@ -1158,7 +975,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           display: 'block',
           touchAction: 'none',
           backgroundColor:
-            receivingVideo && !rendererError ? '#000' : theme.palette.background.default,
+            receivingVideo && !rendererError ? 'transparent' : theme.palette.background.default,
           visibility: receivingVideo && !rendererError ? 'visible' : 'hidden',
           zIndex: receivingVideo && !rendererError ? 1 : -1,
           position: 'relative',
@@ -1180,10 +997,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
             userSelect: 'none',
             pointerEvents: 'none',
             display: 'block',
-            // Mask the brief pre-GL-init window: empty YUV planes rendered
-            // through a BT.601 shader produce green; a black CSS background
-            // covers the canvas area until WebGL paints its first frame.
-            background: '#000'
+            background: 'transparent'
           }}
         />
       </div>

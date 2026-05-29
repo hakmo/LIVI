@@ -3,7 +3,12 @@ import type { ProjectionIpcHost } from './types'
 
 type Deps = Pick<
   ProjectionIpcHost,
-  'start' | 'stop' | 'restartSession' | 'pickPreferredTransport' | 'applyCodecCapabilities'
+  | 'start'
+  | 'stop'
+  | 'restartSession'
+  | 'pickPreferredTransport'
+  | 'applyCodecCapabilities'
+  | 'setVideoVisible'
 >
 
 export function registerLifecycleIpc(host: Deps): void {
@@ -15,6 +20,10 @@ export function registerLifecycleIpc(host: Deps): void {
   })
 
   registerIpcHandle('projection-restart', async () => host.restartSession())
+
+  registerIpcHandle('projection-set-visible', async (_evt, visible: boolean) => {
+    host.setVideoVisible(Boolean(visible))
+  })
 
   registerIpcHandle('projection-codec-capabilities', async (_evt, caps: unknown) => {
     host.applyCodecCapabilities(caps)

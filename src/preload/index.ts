@@ -19,13 +19,9 @@ ipcRenderer.on('usb-event', (event, ...args: unknown[]) => {
 })
 
 type ChunkHandler = (payload: unknown) => void
-let videoChunkQueue: unknown[] = []
-let videoChunkHandler: ChunkHandler | null = null
 let audioChunkQueue: unknown[] = []
 let audioChunkHandler: ChunkHandler | null = null
 
-let clusterVideoChunkQueue: unknown[] = []
-let clusterVideoChunkHandler: ChunkHandler | null = null
 let clusterResolutionQueue: unknown[] = []
 let clusterResolutionHandler: ChunkHandler | null = null
 
@@ -36,18 +32,9 @@ let telemetryHandlers: TelemetryHandler[] = []
 let projectionEventQueue: Array<[IpcRendererEvent, ...unknown[]]> = []
 let projectionEventHandlers: Array<ApiCallback> = []
 
-ipcRenderer.on('projection-video-chunk', (_event, payload: unknown) => {
-  if (videoChunkHandler) videoChunkHandler(payload)
-  else videoChunkQueue.push(payload)
-})
 ipcRenderer.on('projection-audio-chunk', (_event, payload: unknown) => {
   if (audioChunkHandler) audioChunkHandler(payload)
   else audioChunkQueue.push(payload)
-})
-
-ipcRenderer.on('cluster-video-chunk', (_event, payload: unknown) => {
-  if (clusterVideoChunkHandler) clusterVideoChunkHandler(payload)
-  else clusterVideoChunkQueue.push(payload)
 })
 
 ipcRenderer.on('cluster-video-resolution', (_event, payload: unknown) => {
@@ -149,9 +136,9 @@ const api = {
     start: (): Promise<void> => ipcRenderer.invoke('projection-start'),
     stop: (): Promise<void> => ipcRenderer.invoke('projection-stop'),
     restart: (): Promise<void> => ipcRenderer.invoke('projection-restart'),
+    setVisible: (visible: boolean): Promise<void> =>
+      ipcRenderer.invoke('projection-set-visible', visible),
     sendFrame: (): Promise<void> => ipcRenderer.invoke('projection-sendframe'),
-    reportCodecCapabilities: (caps: unknown): Promise<void> =>
-      ipcRenderer.invoke('projection-codec-capabilities', caps),
     setBluetoothPairedList: (listText: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('projection-bt-pairedlist-set', listText),
     connectBluetoothPairedDevice: (mac: string): Promise<{ ok: boolean }> =>
@@ -191,16 +178,6 @@ const api = {
     },
     readMedia: (): Promise<unknown> => ipcRenderer.invoke('projection-media-read'),
     readNavigation: (): Promise<unknown> => ipcRenderer.invoke('projection-navigation-read'),
-    onVideoChunk: (handler: ChunkHandler): void => {
-      videoChunkHandler = handler
-      videoChunkQueue.forEach((chunk) => handler(chunk))
-      videoChunkQueue = []
-    },
-    offVideoChunk: (handler: ChunkHandler): void => {
-      if (videoChunkHandler === handler) {
-        videoChunkHandler = null
-      }
-    },
     onAudioChunk: (handler: ChunkHandler): void => {
       audioChunkHandler = handler
       audioChunkQueue.forEach((chunk) => handler(chunk))
@@ -219,11 +196,6 @@ const api = {
     },
     requestCluster: (enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> =>
       ipcRenderer.invoke('cluster:request', enabled),
-    onClusterVideoChunk: (handler: ChunkHandler): void => {
-      clusterVideoChunkHandler = handler
-      clusterVideoChunkQueue.forEach((chunk) => handler(chunk))
-      clusterVideoChunkQueue = []
-    },
     onClusterResolution: (handler: ChunkHandler): void => {
       clusterResolutionHandler = handler
       clusterResolutionQueue.forEach((chunk) => handler(chunk))

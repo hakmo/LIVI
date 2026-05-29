@@ -146,8 +146,8 @@ declare global {
         start(): Promise<void>
         stop(): Promise<void>
         restart(): Promise<void>
+        setVisible(visible: boolean): Promise<void>
         sendFrame(): Promise<void>
-        reportCodecCapabilities(caps: unknown): Promise<void>
         dongleFirmware(action: DongleFirmwareAction): Promise<DongleFirmwareCheckResult>
 
         sendTouch(x: number, y: number, action: number): void
@@ -166,13 +166,10 @@ declare global {
         readMedia(): Promise<MediaPayload>
         readNavigation(): Promise<unknown>
 
-        onVideoChunk(handler: (payload: unknown) => void): void
-        offVideoChunk(handler: (payload: unknown) => void): void
         onAudioChunk(handler: (payload: unknown) => void): void
         offAudioChunk(handler: (payload: unknown) => void): void
 
         requestCluster(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }>
-        onClusterVideoChunk(handler: (payload: unknown) => void): void
         onClusterResolution(handler: (payload: unknown) => void): void
 
         connectBluetoothPairedDevice(mac: string): Promise<{ ok: boolean }>

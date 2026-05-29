@@ -168,25 +168,6 @@ describe('preload api bridge', () => {
     expect(ipcRendererMock.removeListener).not.toHaveBeenCalledWith('projection-event', cb)
   })
 
-  test('ipc onVideoChunk flushes queued chunks and offVideoChunk clears active handler', () => {
-    const { projection } = loadPreload()
-    const handler = jest.fn()
-
-    emit('projection-video-chunk', { id: 'a', offset: 0 })
-    emit('projection-video-chunk', { id: 'a', offset: 1 })
-
-    projection.ipc.onVideoChunk(handler)
-
-    expect(handler).toHaveBeenCalledTimes(2)
-    expect(handler).toHaveBeenNthCalledWith(1, { id: 'a', offset: 0 })
-    expect(handler).toHaveBeenNthCalledWith(2, { id: 'a', offset: 1 })
-
-    projection.ipc.offVideoChunk(handler)
-    emit('projection-video-chunk', { id: 'b', offset: 0 })
-
-    expect(handler).toHaveBeenCalledTimes(2)
-  })
-
   test('ipc onAudioChunk flushes queued chunks and offAudioChunk clears active handler', () => {
     const { projection } = loadPreload()
     const handler = jest.fn()
@@ -204,16 +185,12 @@ describe('preload api bridge', () => {
 
   test('ipc cluster handlers flush queued cluster payloads', () => {
     const { projection } = loadPreload()
-    const videoHandler = jest.fn()
     const resolutionHandler = jest.fn()
 
-    emit('cluster-video-chunk', { chunk: 1 })
     emit('cluster-video-resolution', { width: 800, height: 480 })
 
-    projection.ipc.onClusterVideoChunk(videoHandler)
     projection.ipc.onClusterResolution(resolutionHandler)
 
-    expect(videoHandler).toHaveBeenCalledWith({ chunk: 1 })
     expect(resolutionHandler).toHaveBeenCalledWith({ width: 800, height: 480 })
   })
 
@@ -381,17 +358,6 @@ describe('preload api bridge', () => {
     expect(handler).toHaveBeenCalledWith({ speed: 77 })
   })
 
-  test('ipc onVideoChunk forwards chunks directly when handler is already registered', () => {
-    const { projection } = loadPreload()
-    const handler = jest.fn()
-
-    projection.ipc.onVideoChunk(handler)
-    emit('projection-video-chunk', { id: 'live-video' })
-
-    expect(handler).toHaveBeenCalledTimes(1)
-    expect(handler).toHaveBeenCalledWith({ id: 'live-video' })
-  })
-
   test('ipc onAudioChunk forwards chunks directly when handler is already registered', () => {
     const { projection } = loadPreload()
     const handler = jest.fn()
@@ -405,36 +371,14 @@ describe('preload api bridge', () => {
 
   test('ipc cluster handlers forward payloads directly when handlers are already registered', () => {
     const { projection } = loadPreload()
-    const videoHandler = jest.fn()
     const resolutionHandler = jest.fn()
 
-    projection.ipc.onClusterVideoChunk(videoHandler)
     projection.ipc.onClusterResolution(resolutionHandler)
 
-    emit('cluster-video-chunk', { chunk: 2 })
     emit('cluster-video-resolution', { width: 1280, height: 720 })
 
-    expect(videoHandler).toHaveBeenCalledTimes(1)
-    expect(videoHandler).toHaveBeenCalledWith({ chunk: 2 })
     expect(resolutionHandler).toHaveBeenCalledTimes(1)
     expect(resolutionHandler).toHaveBeenCalledWith({ width: 1280, height: 720 })
-  })
-
-  test('ipc offVideoChunk ignores different handler and removes matching handler', () => {
-    const { projection } = loadPreload()
-    const activeHandler = jest.fn()
-    const otherHandler = jest.fn()
-
-    projection.ipc.onVideoChunk(activeHandler)
-    projection.ipc.offVideoChunk(otherHandler)
-
-    emit('projection-video-chunk', { id: 'still-active' })
-    expect(activeHandler).toHaveBeenCalledWith({ id: 'still-active' })
-
-    projection.ipc.offVideoChunk(activeHandler)
-    emit('projection-video-chunk', { id: 'after-remove' })
-
-    expect(activeHandler).toHaveBeenCalledTimes(1)
   })
 
   test('ipc offAudioChunk ignores different handler and removes matching handler', () => {
@@ -508,20 +452,16 @@ describe('preload api bridge', () => {
   })
 
   describe('projection ipc wrappers — additional', () => {
-    test('restart, reportCodecCapabilities, switchTransport, getTransportState, getTelemetrySnapshot forward to invoke', async () => {
+    test('restart, switchTransport, getTransportState, getTelemetrySnapshot forward to invoke', async () => {
       const { projection } = loadPreload()
       ipcRendererMock.invoke.mockResolvedValue(undefined)
 
       await projection.ipc.restart()
-      await projection.ipc.reportCodecCapabilities({ h264: true })
       await projection.ipc.switchTransport()
       await projection.ipc.getTransportState()
       await projection.ipc.getTelemetrySnapshot()
 
       expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-restart')
-      expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-codec-capabilities', {
-        h264: true
-      })
       expect(ipcRendererMock.invoke).toHaveBeenCalledWith('transport:switch')
       expect(ipcRendererMock.invoke).toHaveBeenCalledWith('transport:state')
       expect(ipcRendererMock.invoke).toHaveBeenCalledWith('telemetry:snapshot')

@@ -34,6 +34,7 @@ function readMainBounds(rs: runtimeStateProps): WindowBounds | undefined {
 export function createMainWindow(runtimeState: runtimeStateProps, services: ServicesProps) {
   const { projectionService } = services
   const isMac = isMacPlatform()
+  const isLinux = process.platform === 'linux'
 
   const savedBounds = readMainBounds(runtimeState)
 
@@ -46,7 +47,8 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
     useContentSize: true,
     kiosk: false,
     autoHideMenuBar: true,
-    backgroundColor: '#000',
+    transparent: isLinux,
+    backgroundColor: isLinux ? '#00000000' : '#000',
     fullscreenable: true,
     simpleFullscreen: false,
     webPreferences: {

@@ -72,3 +72,22 @@ export function audioDeviceProp(): 'device' | 'device-name' | 'unique-id' {
   if (process.platform === 'win32') return 'device-name'
   return 'device'
 }
+
+export type VideoCodec = 'h264' | 'h265'
+
+export function videoParseElement(codec: VideoCodec): string {
+  return codec === 'h265' ? 'h265parse' : 'h264parse'
+}
+
+// HW-accelerated decoder per platform. Linux is refined on-device
+export function videoDecoderElement(codec: VideoCodec): string {
+  if (process.platform === 'darwin') return 'vtdec'
+  if (process.platform === 'win32') return codec === 'h265' ? 'd3d11h265dec' : 'd3d11h264dec'
+  return codec === 'h265' ? 'v4l2slh265dec' : 'v4l2slh264dec'
+}
+
+export function videoSinkElement(): string {
+  if (process.platform === 'darwin') return 'glimagesink'
+  if (process.platform === 'win32') return 'd3d11videosink'
+  return 'glimagesink'
+}
