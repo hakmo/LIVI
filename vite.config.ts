@@ -77,6 +77,9 @@ export default defineConfig({
     electron({
       main: {
         entry: resolve(__dirname, 'src/main/index.ts'),
+        onstart({ startup }) {
+          startup(['.', '--no-sandbox'], { cwd: __dirname })
+        },
         vite: {
           plugins: [copyAaResourcesPlugin()],
           resolve: {
