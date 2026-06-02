@@ -26,7 +26,7 @@
     "build": "pnpm run typecheck && pnpm run build:app",
     "build:compositor:linux": "bash scripts/compositor/build-linux.sh",
     "postinstall": "electron-builder install-app-deps",
-    "build:mac": "pnpm run build:app && electron-builder --mac --arm64 --publish never --config",
+    "build:mac": "pnpm run build:app && bash scripts/gstreamer/package-macos.sh --relocate-node && electron-builder --mac --arm64 --publish never --config",
     "build:linux": "pnpm run build:app && pnpm run build:compositor:linux && electron-builder --linux AppImage deb --publish never --config",
     "build:linux:appimage": "pnpm run build:app && pnpm run build:compositor:linux && electron-builder --linux AppImage --publish never --config",
     "build:linux:deb": "pnpm run build:app && pnpm run build:compositor:linux && electron-builder --linux deb --publish never --config",

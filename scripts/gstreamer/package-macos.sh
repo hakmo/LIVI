@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Modes:
+#   (default)        build the full bundle into OUT (CI only, via gstreamer-assets.yml)
+#   --relocate-node  only retarget gst_video.node at the committed bundle, never
+#                    touch assets/ (used by build:mac; the bundle is built+committed
+#                    in CI, regenerating it locally pollutes file owners/flags)
+MODE="full"
+if [[ "${1:-}" == "--relocate-node" ]]; then MODE="node"; shift || true; fi
+
 OUT="${1:-assets/gstreamer/macos-arm64}"
 GST_ROOT="/Library/Frameworks/GStreamer.framework/Versions/1.0"
 
@@ -80,6 +88,46 @@ copy_all_pending_libs() {
   done
 }
 
+# rpath/signing helpers + addon relocation, shared by both modes
+resign() {
+  [[ -e "$1" ]] || return 0
+  command -v codesign >/dev/null 2>&1 && codesign --force --sign - "$1" >/dev/null 2>&1 || true
+}
+add_rpath() {
+  local rp="$1" f="$2"
+  [[ -e "$f" ]] || return 0
+  if install_name_tool -add_rpath "$rp" "$f" 2>/dev/null; then resign "$f"; fi
+}
+# Point gst_video.node at the bundle. It ships asar-unpacked, so from
+# .../node_modules/gst-video/build/Release/ the bundle sits 5 levels up at
+# Contents/Resources/gstreamer/macos-arm64/lib. Bundle rpath FIRST (self-contained),
+# the system framework kept as a dev fallback.
+relocate_node() {
+  local REPO_ROOT NODE BUNDLE_RPATH rp
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  NODE="$REPO_ROOT/native/gst-video/build/Release/gst_video.node"
+  BUNDLE_RPATH="@loader_path/../../../../../gstreamer/macos-arm64/lib"
+  if [[ ! -e "$NODE" ]]; then
+    echo "WARN: $NODE not built yet; build the addon before packaging" >&2
+    return 0
+  fi
+  echo "==> Relocating gst_video.node rpath -> bundle (system framework kept as dev fallback)"
+  while read -r rp; do
+    case "$rp" in
+      "$BUNDLE_RPATH" | *GStreamer.framework*)
+        install_name_tool -delete_rpath "$rp" "$NODE" 2>/dev/null || true ;;
+    esac
+  done < <(otool -l "$NODE" 2>/dev/null | awk '/LC_RPATH/{getline;getline;print $2}')
+  add_rpath "$BUNDLE_RPATH" "$NODE"
+  add_rpath "$GST_ROOT/lib" "$NODE"
+}
+
+# --relocate-node: only the addon, never regenerate or touch the committed bundle
+if [[ "$MODE" == "node" ]]; then
+  relocate_node
+  exit 0
+fi
+
 rm -rf "$OUT"
 mkdir -p \
   "$OUT/bin" \
@@ -120,6 +168,7 @@ plugins=(
   # video parse + decode + scale
   libgstvideoparsersbad.dylib
   libgstapplemedia.dylib
+  libgstlibav.dylib
   libgstvideoconvertscale.dylib
   # video sinks
   libgstopengl.dylib
@@ -135,6 +184,16 @@ copy_required "$GST_ROOT/lib/GStreamer" "$OUT/lib/GStreamer"
 
 # all transitive libs
 copy_all_pending_libs
+
+# Make the bundle self-contained (most framework Mach-Os already carry @loader_path
+# rpaths; add the few that are missing and ad-hoc re-sign).
+echo "==> Relocating rpaths to @loader_path + ad-hoc signing where needed"
+for f in "$OUT"/lib/*.dylib "$OUT/lib/GStreamer"; do add_rpath "@loader_path" "$f"; done
+for f in "$OUT"/lib/gstreamer-1.0/*.dylib; do add_rpath "@loader_path/.." "$f"; done
+for f in "$OUT"/bin/*; do add_rpath "@loader_path/../lib" "$f"; done
+add_rpath "@loader_path/../../lib" "$OUT/libexec/gstreamer-1.0/gst-plugin-scanner"
+
+relocate_node
 
 echo "Created macOS GStreamer bundle at: $OUT"
 echo "Bundle size:"

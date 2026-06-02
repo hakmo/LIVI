@@ -1,4 +1,4 @@
-import { BrowserWindow, type WebContents } from 'electron'
+import { app, BrowserWindow, type WebContents } from 'electron'
 import path from 'path'
 import { resolveGStreamerRoot } from '../audio/gstreamer'
 
@@ -36,10 +36,20 @@ function prepareWindowsRuntime(): void {
   )
 }
 
+function prepareMacRuntime(): void {
+  if (process.platform !== 'darwin' || !app.isPackaged) return
+  const root = resolveGStreamerRoot()
+  if (!root) return
+  process.env.GST_PLUGIN_SYSTEM_PATH = ''
+  process.env.GST_PLUGIN_PATH = path.join(root, 'lib', 'gstreamer-1.0')
+  process.env.GST_PLUGIN_SCANNER = path.join(root, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+}
+
 function load(): GstAddon | null {
   if (addon || loadFailed) return addon
   try {
     prepareWindowsRuntime()
+    prepareMacRuntime()
     addon = require('gst-video') as GstAddon
     console.log('[GstVideo]', addon.version())
   } catch (e) {
