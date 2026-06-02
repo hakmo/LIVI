@@ -10,7 +10,7 @@ import type { KeyCommand, ProjectionWorker, UsbEvent, WorkerToUI } from '@worker
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useLiviStore, useStatusStore } from '../../../store/store'
-import { useCarplayMultiTouch } from './hooks/useCarplayTouch'
+import { useProjectionMultiTouch } from './hooks/useProjectionTouch'
 
 const RETRY_DELAY_MS = 3000
 
@@ -837,6 +837,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const resolvedNegotiatedWidth = negotiatedWidth ?? 0
   const resolvedNegotiatedHeight = negotiatedHeight ?? 0
 
+  // The phone renders a user-chosen AR inside the transport tier
   const aaContent =
     resolvedNegotiatedWidth > 0 &&
     resolvedNegotiatedHeight > 0 &&
@@ -850,20 +851,15 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   const visibleWidth = aaContent?.contentWidth ?? resolvedNegotiatedWidth
   const visibleHeight = aaContent?.contentHeight ?? resolvedNegotiatedHeight
-  const cropLeft = Math.max(0, (resolvedNegotiatedWidth - visibleWidth) / 2)
-  const cropTop = Math.max(0, (resolvedNegotiatedHeight - visibleHeight) / 2)
 
-  const touchHandlers = useCarplayMultiTouch(
+  const touchHandlers = useProjectionMultiTouch(
     videoContainerRef,
-    aaContent &&
-      (cropLeft > 0 || cropTop > 0) &&
-      resolvedNegotiatedWidth > 0 &&
-      resolvedNegotiatedHeight > 0
+    resolvedNegotiatedWidth > 0 && resolvedNegotiatedHeight > 0
       ? {
           streamWidth: resolvedNegotiatedWidth,
           streamHeight: resolvedNegotiatedHeight,
-          cropLeft,
-          cropTop,
+          cropLeft: Math.max(0, (resolvedNegotiatedWidth - visibleWidth) / 2),
+          cropTop: Math.max(0, (resolvedNegotiatedHeight - visibleHeight) / 2),
           visibleWidth,
           visibleHeight
         }

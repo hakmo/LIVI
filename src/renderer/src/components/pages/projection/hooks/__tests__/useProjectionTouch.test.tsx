@@ -1,9 +1,9 @@
 import { MultiTouchAction, TouchAction } from '@shared/types/ProjectionEnums'
 import { renderHook } from '@testing-library/react'
 import { createRef } from 'react'
-import { useCarplayMultiTouch } from '../useCarplayTouch'
+import { useProjectionMultiTouch } from '../useProjectionTouch'
 
-describe('useCarplayMultiTouch', () => {
+describe('useProjectionMultiTouch', () => {
   const sendTouch = jest.fn()
   const sendMultiTouch = jest.fn()
 
@@ -52,7 +52,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerDown(ptrEvent(target, { pointerType: 'mouse' }))
     expect(sendTouch).toHaveBeenCalledWith(0.5, 0.5, TouchAction.Down)
@@ -69,7 +69,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerMove(ptrEvent(target, { pointerType: 'mouse' }))
     result.current.onPointerUp(ptrEvent(target, { pointerType: 'mouse' }))
@@ -82,7 +82,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerDown(ptrEvent(target, { clientX: 200, clientY: 200 }))
     result.current.onPointerMove(ptrEvent(target, { clientX: 200, clientY: 200 }))
@@ -96,7 +96,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerDown(ptrEvent(target, { pointerType: 'touch', pointerId: 11 }))
     expect(target.setPointerCapture).toHaveBeenCalledWith(11)
@@ -125,7 +125,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerDown(ptrEvent(target, { pointerId: 1 }))
     result.current.onPointerCancel(ptrEvent(target, { pointerId: 1, clientX: 55 }))
@@ -146,7 +146,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
 
     result.current.onPointerDown(ptrEvent(target, { pointerId: 12, clientX: 40, clientY: 40 }))
     result.current.onPointerOut(ptrEvent(target, { pointerId: 12 }))
@@ -162,7 +162,7 @@ describe('useCarplayMultiTouch', () => {
     const videoRef = createRef<HTMLElement>()
     videoRef.current = target
 
-    const { result } = renderHook(() => useCarplayMultiTouch(videoRef))
+    const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
     const preventDefault = jest.fn()
 
     result.current.onContextMenu({ preventDefault } as unknown as React.MouseEvent<HTMLDivElement>)

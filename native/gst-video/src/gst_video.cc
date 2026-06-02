@@ -15,6 +15,8 @@
 extern "C" guintptr livi_attach_view(guintptr parent, void** outView);
 extern "C" void livi_remove_view(void* view);
 extern "C" void livi_set_view_hidden(void* view, bool hidden);
+extern "C" void livi_set_content_region(void* view, void* sink, double cropL,
+    double cropT, double visW, double visH, double tierW, double tierH);
 #else
 static guintptr livi_attach_view(guintptr parent, void** outView) {
   *outView = nullptr;
@@ -22,6 +24,8 @@ static guintptr livi_attach_view(guintptr parent, void** outView) {
 }
 static void livi_remove_view(void*) {}
 static void livi_set_view_hidden(void*, bool) {}
+static void livi_set_content_region(void*, void*, double, double, double, double,
+    double, double) {}
 #endif
 
 struct Player {
@@ -495,6 +499,24 @@ static napi_value Stop(napi_env env, napi_callback_info info) {
   return undef;
 }
 
+static napi_value SetContentRegion(napi_env env, napi_callback_info info) {
+  size_t argc = 7;
+  napi_value argv[7];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  Player* p = argc >= 1 ? unwrap(env, argv[0]) : nullptr;
+  if (p && p->view) {
+    auto d = [&](size_t idx) -> double {
+      double v = 0;
+      if (argc > idx) napi_get_value_double(env, argv[idx], &v);
+      return v;
+    };
+    livi_set_content_region(p->view, p->sink, d(1), d(2), d(3), d(4), d(5), d(6));
+  }
+  napi_value undef;
+  napi_get_undefined(env, &undef);
+  return undef;
+}
+
 static napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
   napi_create_function(env, "version", NAPI_AUTO_LENGTH, Version, NULL, &fn);
@@ -509,6 +531,8 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_set_named_property(env, exports, "pushBuffer", fn);
   napi_create_function(env, "setVisible", NAPI_AUTO_LENGTH, SetVisible, NULL, &fn);
   napi_set_named_property(env, exports, "setVisible", fn);
+  napi_create_function(env, "setContentRegion", NAPI_AUTO_LENGTH, SetContentRegion, NULL, &fn);
+  napi_set_named_property(env, exports, "setContentRegion", fn);
   napi_create_function(env, "stop", NAPI_AUTO_LENGTH, Stop, NULL, &fn);
   napi_set_named_property(env, exports, "stop", fn);
   return exports;

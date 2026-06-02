@@ -33,41 +33,50 @@ const norm = (
 ) => {
   const target = videoRef.current ?? eventTarget
   const r = target.getBoundingClientRect()
+  if (r.width <= 0 || r.height <= 0) return null
 
-  if (r.width <= 0 || r.height <= 0) {
-    return null
-  }
-
-  if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) {
-    return null
-  }
-
-  const localX = cx - r.left
-  const localY = cy - r.top
-
+  // No usable transform yet: map straight to the container.
   if (
-    transform &&
-    transform.streamWidth > 0 &&
-    transform.streamHeight > 0 &&
-    transform.visibleWidth > 0 &&
-    transform.visibleHeight > 0
+    !transform ||
+    transform.visibleWidth <= 0 ||
+    transform.visibleHeight <= 0 ||
+    transform.streamWidth <= 0 ||
+    transform.streamHeight <= 0
   ) {
-    const streamX = transform.cropLeft + (localX / r.width) * transform.visibleWidth
-    const streamY = transform.cropTop + (localY / r.height) * transform.visibleHeight
-
-    return {
-      x: clamp01(streamX / transform.streamWidth),
-      y: clamp01(streamY / transform.streamHeight)
-    }
+    const lx = cx - r.left
+    const ly = cy - r.top
+    if (lx < 0 || lx > r.width || ly < 0 || ly > r.height) return null
+    return { x: clamp01(lx / r.width), y: clamp01(ly / r.height) }
   }
 
+  // display-letterbox by the content AR
+  const contentAR = transform.visibleWidth / transform.visibleHeight
+  let dispW = r.width
+  let dispH = r.height
+  let offX = 0
+  let offY = 0
+  if (r.width / r.height > contentAR) {
+    dispW = r.height * contentAR
+    offX = (r.width - dispW) / 2
+  } else {
+    dispH = r.width / contentAR
+    offY = (r.height - dispH) / 2
+  }
+
+  const lx = cx - r.left - offX
+  const ly = cy - r.top - offY
+  if (lx < 0 || lx > dispW || ly < 0 || ly > dispH) return null
+
+  // content-crop onto the transport tier
+  const streamX = transform.cropLeft + (lx / dispW) * transform.visibleWidth
+  const streamY = transform.cropTop + (ly / dispH) * transform.visibleHeight
   return {
-    x: clamp01(localX / r.width),
-    y: clamp01(localY / r.height)
+    x: clamp01(streamX / transform.streamWidth),
+    y: clamp01(streamY / transform.streamHeight)
   }
 }
 
-export const useCarplayMultiTouch = (
+export const useProjectionMultiTouch = (
   videoRef: RefObject<HTMLElement | null>,
   transform?: TouchTransform
 ): Handlers => {

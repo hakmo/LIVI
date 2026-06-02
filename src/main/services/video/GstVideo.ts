@@ -14,6 +14,15 @@ interface GstAddon {
   start(player: unknown): void
   pushBuffer(player: unknown, buffer: Buffer): boolean
   setVisible(player: unknown, visible: boolean): void
+  setContentRegion(
+    player: unknown,
+    cropL: number,
+    cropT: number,
+    visW: number,
+    visH: number,
+    tierW: number,
+    tierH: number
+  ): void
   stop(player: unknown): void
 }
 
@@ -77,6 +86,15 @@ export class GstVideo {
   private player: unknown = null
   private codec: GstVideoCodec | null = null
   private visible = true
+  // AA content region inside the decoded tier (so the user-chosen AR fills the display)
+  private region: {
+    cropL: number
+    cropT: number
+    visW: number
+    visH: number
+    tierW: number
+    tierH: number
+  } | null = null
 
   constructor(private readonly wc: WebContents) {}
 
@@ -98,6 +116,7 @@ export class GstVideo {
     if (this.player) {
       a.start(this.player)
       a.setVisible(this.player, this.visible)
+      if (this.region) this.applyRegion(a)
     }
   }
 
@@ -112,6 +131,35 @@ export class GstVideo {
   setVisible(visible: boolean): void {
     this.visible = visible
     if (addon && this.player) addon.setVisible(this.player, visible)
+  }
+
+  // Set the AA content region inside the decoded tier. The native view crops to it by
+  // sizing + positioning the GL render (zero-copy); bars appear only on a window-AR
+  // mismatch. Buffered and re-applied when the player is (re)created.
+  setContentRegion(
+    cropL: number,
+    cropT: number,
+    visW: number,
+    visH: number,
+    tierW: number,
+    tierH: number
+  ): void {
+    this.region = visW > 0 && visH > 0 ? { cropL, cropT, visW, visH, tierW, tierH } : null
+    if (addon && this.player) this.applyRegion(addon)
+  }
+
+  private applyRegion(a: GstAddon): void {
+    if (!this.player) return
+    const r = this.region
+    a.setContentRegion(
+      this.player,
+      r?.cropL ?? 0,
+      r?.cropT ?? 0,
+      r?.visW ?? 0,
+      r?.visH ?? 0,
+      r?.tierW ?? 0,
+      r?.tierH ?? 0
+    )
   }
 
   dispose(): void {

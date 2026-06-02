@@ -6,7 +6,7 @@ import type { Config, DevListEntry } from '@shared/types'
 import { PhoneWorkMode } from '@shared/types'
 import { isInputCommand } from '@shared/types/InputCommand'
 import type { NavLocale } from '@shared/utils'
-import { isClusterDisplayed, translateNavigation } from '@shared/utils'
+import { aaContentArea, isClusterDisplayed, translateNavigation } from '@shared/utils'
 import { app, WebContents } from 'electron'
 import fs from 'fs'
 import path from 'path'
@@ -135,6 +135,14 @@ export class ProjectionService {
   private gstVideo: GstVideo | null = null
   private gstVideoCodec: GstVideoCodec = 'h264'
   private gstVideoVisible = true
+  private videoCrop: {
+    cropL: number
+    cropT: number
+    visW: number
+    visH: number
+    tierW: number
+    tierH: number
+  } | null = null
   private gstVideoCluster: GstVideo | null = null
   private gstVideoClusterCodec: GstVideoCodec = 'h264'
   private dongleFwVersion?: string
@@ -550,6 +558,7 @@ export class ProjectionService {
       if (w > 0 && h > 0 && (w !== this.lastVideoWidth || h !== this.lastVideoHeight)) {
         this.lastVideoWidth = w
         this.lastVideoHeight = h
+        this.updateVideoCrop()
 
         this.emitProjectionEvent({
           type: 'resolution',
@@ -713,12 +722,49 @@ export class ProjectionService {
     wc.send('projection-event', { type: 'video-codec', payload: { codec } })
   }
 
+  private updateVideoCrop(): void {
+    const tw = this.lastVideoWidth ?? 0
+    const th = this.lastVideoHeight ?? 0
+    const dw = this.config.width ?? 0
+    const dh = this.config.height ?? 0
+    if (tw > 0 && th > 0 && dw > 0 && dh > 0) {
+      const { contentWidth, contentHeight } = aaContentArea(
+        { width: tw, height: th },
+        { width: dw, height: dh }
+      )
+      this.videoCrop = {
+        cropL: Math.max(0, (tw - contentWidth) / 2),
+        cropT: Math.max(0, (th - contentHeight) / 2),
+        visW: contentWidth,
+        visH: contentHeight,
+        tierW: tw,
+        tierH: th
+      }
+    } else {
+      this.videoCrop = null
+    }
+    this.applyVideoCrop()
+  }
+
+  private applyVideoCrop(): void {
+    const r = this.videoCrop
+    this.gstVideo?.setContentRegion(
+      r?.cropL ?? 0,
+      r?.cropT ?? 0,
+      r?.visW ?? 0,
+      r?.visH ?? 0,
+      r?.tierW ?? 0,
+      r?.tierH ?? 0
+    )
+  }
+
   private pushGstVideo(nal: Buffer): void {
     const wc = this.webContents
     if (!wc || wc.isDestroyed?.()) return
     if (!this.gstVideo) {
       this.gstVideo = new GstVideo(wc)
       this.gstVideo.setVisible(this.gstVideoVisible)
+      this.applyVideoCrop()
     }
     this.gstVideo.push(this.gstVideoCodec, nal)
   }

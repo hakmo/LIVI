@@ -53,8 +53,8 @@ jest.mock('../../../../store/store', () => {
   return { useStatusStore, useLiviStore }
 })
 
-jest.mock('../hooks/useCarplayTouch', () => ({
-  useCarplayMultiTouch: () => ({})
+jest.mock('../hooks/useProjectionTouch', () => ({
+  useProjectionMultiTouch: () => ({})
 }))
 
 class MockWorker {
