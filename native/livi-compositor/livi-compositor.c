@@ -1516,6 +1516,16 @@ int main(int argc, char *argv[]) {
 	wlr_log(WLR_INFO, "Running livi-compositor on WAYLAND_DISPLAY=%s", socket);
 	wl_display_run(server.wl_display);
 
+	// LIVI: full restart -> re-exec before the wlroots teardown.
+	if (server.full_restart) {
+		if (server.startup_pid > 0)
+			kill(server.startup_pid, SIGTERM);
+		wlr_log(WLR_INFO, "livi: re-exec for full restart");
+		execv("/proc/self/exe", server.argv);
+		execvp(server.argv[0], server.argv);
+		wlr_log(WLR_ERROR, "livi: re-exec failed: %s", strerror(errno));
+	}
+
 	/* LIVI: take the spawned UI down with us */
 	if (server.startup_pid > 0) {
 		kill(server.startup_pid, SIGTERM);
@@ -1560,12 +1570,5 @@ int main(int argc, char *argv[]) {
 	wl_display_destroy(server.wl_display);
 	free(server.screens);
 
-	// Full restart: re-exec ourselves now that the old outputs/clients/ctrl socket are torn
-	// down, so we come up exactly like a fresh launch (fresh inner + AA session).
-	if (server.full_restart) {
-		wlr_log(WLR_INFO, "livi: re-exec for full restart");
-		execvp(server.argv[0], server.argv);
-		wlr_log(WLR_ERROR, "livi: re-exec failed: %s", strerror(errno));
-	}
 	return 0;
 }
