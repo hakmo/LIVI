@@ -56,8 +56,14 @@ export function registerAppIpc(runtimeState: runtimeStateProps, services: Servic
       // best-effort
     }
 
-    // In the compositor the app is the inner UI child. Ask the compositor to relaunch it (it kills + re-spawns us)
-    if (compositorRestart()) return
+    // In the compositor: tell it to re-exec (full_restart), then quit ourselves cleanly so our
+    // surfaces disconnect while the compositor loop is still alive
+    if (compositorRestart()) {
+      await new Promise((r) => setTimeout(r, 100))
+      runtimeState.isQuitting = true
+      app.quit()
+      return
+    }
 
     if (process.platform === 'linux' && process.env.APPIMAGE) {
       const appImage = process.env.APPIMAGE

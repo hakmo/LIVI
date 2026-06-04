@@ -123,8 +123,10 @@ struct tinywl_server {
 
 	// inner UI child (the -s startup command)
 	char *startup_cmd;
+	const char *ui_socket;   // WAYLAND_DISPLAY the inner UI connects to (set per-child only)
 	pid_t startup_pid;
 	bool full_restart;   // on shutdown, re-exec the whole compositor instead of exiting
+	struct wl_event_source *restart_timer;   // fallback if the inner UI doesn't exit on SIGTERM
 	char **argv;         // saved for the re-exec
 };
 
@@ -1141,6 +1143,9 @@ static void spawn_startup(struct tinywl_server *server) {
 	}
 	pid_t pid = fork();
 	if (pid == 0) {
+		if (server->ui_socket != NULL) {
+			setenv("WAYLAND_DISPLAY", server->ui_socket, 1);
+		}
 		execl("/bin/sh", "/bin/sh", "-c", server->startup_cmd, (void *)NULL);
 		_exit(127);
 	}
@@ -1157,6 +1162,18 @@ struct livi_ctrl_client {
 	size_t len;
 };
 
+// Fallback: if the inner UI never quits, SIGKILL it
+static int restart_timeout(void *data) {
+	struct tinywl_server *server = data;
+	wlr_log(WLR_INFO, "livi: inner UI did not quit -> SIGKILL, then re-exec");
+	if (server->startup_pid > 0) {
+		kill(server->startup_pid, SIGKILL);
+	} else {
+		wl_display_terminate(server->wl_display);
+	}
+	return 0;
+}
+
 static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 	char tag[64], srole[32];
 	double cl, ct, vw, vh, tw, th;
@@ -1165,12 +1182,20 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 	// restart the inner UI: kill the current child and re-spawn it. The compositor (and
 	// thus the host output windows) stays up, only the Electron app relaunches.
 	if (strcmp(line, "restart") == 0) {
-		// Full restart: re-exec the whole compositor (fresh outputs + fresh inner), which
-		// is what a manual close+relaunch does. Relaunching only the inner left stale
-		// compositor/session state and the stream wouldn't show.
-		wlr_log(WLR_INFO, "livi: restart requested -> full compositor re-exec");
+		// Full restart
+		wlr_log(WLR_INFO, "livi: restart requested -> waiting for inner UI to quit, then re-exec");
 		server->full_restart = true;
-		wl_display_terminate(server->wl_display);
+		if (server->startup_pid > 0) {
+			if (server->restart_timer == NULL) {
+				server->restart_timer = wl_event_loop_add_timer(
+					wl_display_get_event_loop(server->wl_display), restart_timeout, server);
+			}
+			if (server->restart_timer != NULL) {
+				wl_event_source_timer_update(server->restart_timer, 8000);
+			}
+		} else {
+			wl_display_terminate(server->wl_display);
+		}
 		return;
 	}
 
@@ -1471,6 +1496,7 @@ int main(int argc, char *argv[]) {
 		wlr_backend_destroy(server.backend);
 		return 1;
 	}
+	server.ui_socket = socket;
 
 	if (!wlr_backend_start(server.backend)) {
 		wlr_backend_destroy(server.backend);
@@ -1481,7 +1507,6 @@ int main(int argc, char *argv[]) {
 	// nested backend auto-creates one output -> the main screen. Secondary screens
 	// (dash/aux) are opened on demand by the host via the "screen <role> 1" command.
 
-	setenv("WAYLAND_DISPLAY", socket, true);
 	ctrl_init(&server);   // before forking the UI, so the host can connect immediately
 	// Auto-reap the UI child so we never leave zombies.
 	signal(SIGCHLD, SIG_IGN);
