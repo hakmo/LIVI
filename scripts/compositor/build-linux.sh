@@ -28,9 +28,13 @@ done
 # host-output control for app-kiosk + our own decorations. force-fallback-for builds the
 # pinned 0.20 subproject even when a system wlroots-0.20 exists, so the patch always applies.
 echo "→ Forcing pinned wlroots-0.20 subproject (carries the LIVI output-control patch)"
-MESON_ARGS=(--buildtype=release --wrap-mode=default --force-fallback-for=wlroots-0.20)
+MESON_ARGS=(--buildtype=release --wrap-mode=default)
+fallback="wlroots-0.20"
 
 if ! pkg-config --exists 'wlroots-0.20'; then
+  # No system wlroots: the whole stack is built from wraps. Force wayland from the wrap too, so the
+  # bundled wayland-scanner matches the (newer) wayland-protocols.
+  fallback="$fallback,wayland,wayland-protocols"
   MESON_ARGS+=(
     -Dwayland:documentation=false
     -Dwayland:tests=false
@@ -40,6 +44,8 @@ if ! pkg-config --exists 'wlroots-0.20'; then
     -Dlibxkbcommon:enable-xkbregistry=false
   )
 fi
+
+MESON_ARGS+=(--force-fallback-for="$fallback")
 
 echo "→ Configuring livi-compositor"
 if [[ -d "$BUILD_DIR" ]]; then
