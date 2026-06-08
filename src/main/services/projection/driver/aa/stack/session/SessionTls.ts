@@ -76,6 +76,10 @@ export class SessionTls {
     this._writeChain = this._writeChain.then(
       () =>
         new Promise<void>((resolve) => {
+          if (sock.destroyed || sock.writableEnded) {
+            resolve()
+            return
+          }
           this._pendingChannelId = channelId
           this._pendingFlags = flags
           sock.write(cleartext, () => resolve())

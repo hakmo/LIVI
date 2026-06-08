@@ -138,15 +138,21 @@ export function attachKioskStateSync(runtimeState: runtimeStateProps) {
     if (lastSent === effectiveKiosk) return
     lastSent = effectiveKiosk
 
-    if (!effectiveKiosk && getMainKiosk(runtimeState.config)) {
-      runtimeState.wmExitedKiosk = true
-      saveSettings(runtimeState, { kiosk: withMainKiosk(runtimeState.config, false) })
+    // Window fullscreen state already matches config: nothing to persist, just refresh the UI.
+    if (effectiveKiosk === getMainKiosk(runtimeState.config)) {
+      pushSettingsToRenderer(runtimeState, {
+        kiosk: withMainKiosk(runtimeState.config, effectiveKiosk)
+      })
       return
     }
 
-    pushSettingsToRenderer(runtimeState, {
-      kiosk: withMainKiosk(runtimeState.config, effectiveKiosk)
-    })
+    // Window fullscreen diverged from config, reconcile it. Leaving kiosk is a WM pull-out
+    // (swipe gesture), flag it so focus restores kiosk. Entering from outside Electron (the
+    // compositor titlebar button) just persists so the settings slider can toggle it back.
+    if (!effectiveKiosk) {
+      runtimeState.wmExitedKiosk = true
+    }
+    saveSettings(runtimeState, { kiosk: withMainKiosk(runtimeState.config, effectiveKiosk) })
   }
 
   const syncFromElectron = () => {
@@ -169,4 +175,31 @@ export function attachKioskStateSync(runtimeState: runtimeStateProps) {
   win.on('minimize', syncFromElectron)
 
   syncFromElectron()
+}
+
+// Nudges Chromium to re-render at the new window size after a resize settles.
+export function attachResizeReflow() {
+  if (process.env.LIVI_COMPOSITOR !== '1') return
+  const win: BrowserWindow | null = getMainWindow()
+  if (!win) return
+
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let nudging = false
+
+  win.on('resize', () => {
+    if (nudging || win.isDestroyed()) return
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      if (win.isDestroyed() || win.isFullScreen()) return
+      nudging = true
+      const [w, h] = win.getContentSize()
+      win.setContentSize(w, h + 1)
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.setContentSize(w, h)
+        setTimeout(() => {
+          nudging = false
+        }, 60)
+      }, 60)
+    }, 200)
+  })
 }

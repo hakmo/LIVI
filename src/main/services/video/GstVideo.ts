@@ -2,8 +2,14 @@ import net from 'node:net'
 import { app, BrowserWindow, type WebContents } from 'electron'
 import path from 'path'
 import { resolveGStreamerRoot } from '../audio/gstreamer'
+import { gstHost } from './gstHost'
 
 export type GstVideoCodec = 'h264' | 'h265' | 'vp9' | 'av1'
+
+// Linux runs the pipeline in the gstHost child process (its own GLib loop so waylandsink resizes
+// live, and out of reach of the Electron-vs-system libffi crash). mac/Windows render in-process.
+const useHostProcess = process.platform === 'linux'
+let nextPlayerId = 1
 
 // Linux: control channel to livi-compositor. Video planes are addressed by tag (claim),
 // then placed (videocfg) and toggled (videoshow). `state` is resent on reconnect.
@@ -218,8 +224,11 @@ export function probeGstCodecs(): GstCodecProbe {
   }
 }
 
-// In-process GStreamer video player rendering into a window's native surface
+// GStreamer video player. On Linux the pipeline lives in the gstHost child process and this only
+// holds an id for it; on mac/Windows it drives the in-process addon directly.
 export class GstVideo {
+  private readonly id = nextPlayerId++
+  private started = false
   private player: unknown = null
   private codec: GstVideoCodec | null = null
   private visible = true
@@ -247,13 +256,22 @@ export class GstVideo {
   }
 
   private ensure(codec: GstVideoCodec): void {
+    if (useHostProcess) {
+      if (this.started && this.codec === codec) return
+      this.dispose()
+      compositorControl.claim(this.role) // tag the waylandsink toplevel the host process creates next
+      gstHost.createPlayer(this.id, codec)
+      this.codec = codec
+      this.started = true
+      return
+    }
     const a = load()
     if (!a) return
     if (this.player && this.codec === codec) return
     this.dispose()
     const handle = this.windowHandle()
     if (!handle) return
-    compositorControl.claim(this.role) // Linux: tag the waylandsink toplevel we create next
+    compositorControl.claim(this.role)
     this.player = a.createPlayer(codec, handle)
     this.codec = codec
     if (this.player) {
@@ -264,6 +282,11 @@ export class GstVideo {
   }
 
   push(codec: GstVideoCodec, nal: Buffer): void {
+    if (useHostProcess) {
+      this.ensure(codec)
+      if (this.started) gstHost.pushBuffer(this.id, nal)
+      return
+    }
     const a = load()
     if (!a) return
     this.ensure(codec)
@@ -308,6 +331,12 @@ export class GstVideo {
   }
 
   dispose(): void {
+    if (useHostProcess) {
+      if (this.started) gstHost.stop(this.id)
+      this.started = false
+      this.codec = null
+      return
+    }
     if (addon && this.player) {
       try {
         addon.stop(this.player)

@@ -1,4 +1,5 @@
 import { is } from '@electron-toolkit/utils'
+import { COMPOSITOR_TITLEBAR_H } from '@main/app/compositorLayout'
 import { configEvents, saveSettings } from '@main/ipc/utils'
 import { setCompositorScreen } from '@main/services/video/GstVideo'
 import { runtimeStateProps } from '@main/types'
@@ -228,9 +229,10 @@ export function syncSecondaryWindows(runtimeState: runtimeStateProps, prev?: Con
     const kioskChanged = prev && (prev.kiosk?.[spec.role] === true) !== getKioskFor(cfg, spec.role)
 
     const { w, h } = getSize(cfg, spec)
+    const outH = getKioskFor(cfg, spec.role) ? h : h + COMPOSITOR_TITLEBAR_H
 
     if (!prev || prev[spec.activeKey] !== cfg[spec.activeKey]) {
-      setCompositorScreen(spec.role, wantActive, w, h)
+      setCompositorScreen(spec.role, wantActive, w, outH)
     }
 
     if (wantActive && !windows.has(spec.role)) {
@@ -243,7 +245,7 @@ export function syncSecondaryWindows(runtimeState: runtimeStateProps, prev?: Con
 
         if (inCompositor) {
           setCompositorScreen(spec.role, false)
-          setCompositorScreen(spec.role, true, w, h)
+          setCompositorScreen(spec.role, true, w, outH)
         }
       }
       if (kioskChanged) applyKiosk(spec, runtimeState)

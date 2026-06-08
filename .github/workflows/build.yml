@@ -190,7 +190,7 @@ jobs:
               pkg-config libusb-1.0-0 libudev1 ca-certificates \
               libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
               ninja-build bison \
-              libegl-dev libgles-dev libgbm-dev \
+              libegl-dev libgles-dev libgbm-dev libcairo2-dev \
               libffi-dev libexpat1-dev
           sudo rm -rf /var/lib/apt/lists/*
           sudo pip3 install --break-system-packages --upgrade 'meson>=1.4'
@@ -244,7 +244,7 @@ jobs:
               pkg-config libusb-1.0-0 libudev1 ca-certificates \
               libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
               ninja-build bison \
-              libegl-dev libgles-dev libgbm-dev \
+              libegl-dev libgles-dev libgbm-dev libcairo2-dev \
               libffi-dev libexpat1-dev
           sudo rm -rf /var/lib/apt/lists/*
           sudo pip3 install --break-system-packages --upgrade 'meson>=1.4'

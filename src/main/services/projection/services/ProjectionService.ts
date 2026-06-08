@@ -169,7 +169,6 @@ export class ProjectionService {
   private readonly statusFile = new StatusFileWriter()
 
   private aaBtSupervisor: AaBluetoothSupervisor | null = null
-  private aaBtSupervisorMode: 'wireless' | 'monitor' | null = null
   private wirelessPhoneInRange = false
   private btInitialQueryDone = false
   private isSwitching = false
@@ -271,23 +270,9 @@ export class ProjectionService {
   }
 
   private syncAaBtSupervisor(): void {
-    // BT stack runs on Linux whenever the host has a BlueZ adapter, regardless
-    // of wirelessAaEnabled. The mode (wireless / monitor) is passed via env to
-    // the python supervisor, toggling wirelessAaEnabled restarts it.
-    const want = process.platform === 'linux'
-    const desiredMode = this.config.wirelessAaEnabled === true ? 'wireless' : 'monitor'
-
-    if (want && this.aaBtSupervisor && this.aaBtSupervisorMode !== desiredMode) {
-      console.log(
-        `[ProjectionService] restarting AA BT supervisor (mode ${this.aaBtSupervisorMode} → ${desiredMode})`
-      )
-      const sup = this.aaBtSupervisor
-      this.aaBtSupervisor = null
-      this.aaBtSupervisorMode = null
-      sup.stop().catch((e) => console.warn('[ProjectionService] supervisor stop threw', e))
-      this.closeAaBtSubscription()
-      this.sessionActiveSent = null
-    }
+    // The root BT/Wi-Fi helper is only needed for wireless AA (BlueZ pairing + hostapd/dnsmasq).
+    //Supervisor stays off while wireless AA is disabled.
+    const want = process.platform === 'linux' && this.config.wirelessAaEnabled === true
 
     if (want && !this.aaBtSupervisor) {
       const sup = new AaBluetoothSupervisor({ maxRestarts: 5 })
@@ -295,9 +280,8 @@ export class ProjectionService {
       sup.on('stderr', (line) => console.warn(`[aa-bt!] ${line}`))
       sup.on('error', (err) => console.warn(`[aa-bt] supervisor error: ${err.message}`))
       this.aaBtSupervisor = sup
-      this.aaBtSupervisorMode = desiredMode
       this.sessionActiveSent = null
-      console.log(`[ProjectionService] starting AA BT supervisor (mode=${desiredMode})`)
+      console.log('[ProjectionService] starting AA BT supervisor')
       sup.start(this.config)
       this.openAaBtSubscription()
       this.populateAaBtPairedListInitial()
@@ -315,7 +299,6 @@ export class ProjectionService {
       console.log('[ProjectionService] stopping AA BT supervisor')
       const sup = this.aaBtSupervisor
       this.aaBtSupervisor = null
-      this.aaBtSupervisorMode = null
       sup.stop().catch((e) => console.warn('[ProjectionService] supervisor stop threw', e))
       this.closeAaBtSubscription()
       this.setWirelessPhoneInRange(false)
@@ -890,7 +873,6 @@ export class ProjectionService {
     if (this.aaBtSupervisor) {
       const sup = this.aaBtSupervisor
       this.aaBtSupervisor = null
-      this.aaBtSupervisorMode = null
       sup.stop().catch(() => {})
     }
   }
@@ -1019,8 +1001,6 @@ export class ProjectionService {
     const p = probeGstCodecs()
     const hwCap = (s: { hw: boolean }): { hw?: unknown; sw?: unknown } | undefined =>
       s.hw ? { hw: true, sw: true } : undefined
-    // Offer h265 when it has a HW decoder, or when it can only be done in software
-    // but there's no HW h264 to fall back on either. Pi3/Pi4 (HW h264, no HW h265) must stay on h264.
     const h265Cap = p.h265.hw || (p.h265.sw && !p.h264.hw) ? { hw: true, sw: true } : undefined
     this.lastCodecCaps = {
       h264: { hw: true, sw: true },

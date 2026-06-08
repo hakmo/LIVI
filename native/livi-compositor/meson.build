@@ -1,5 +1,5 @@
 project('livi-compositor', 'c',
-  default_options: ['c_std=c11', 'warning_level=1'])
+  default_options: ['c_std=c23,c2x', 'warning_level=1'])
 
 # System wlroots-0.20 when present (Fedora dev box), else the pinned 0.20
 # subproject. CI/Ubuntu and the Pi ship older wlroots, so the AppImage carries
@@ -19,9 +19,10 @@ wlroots = dependency('wlroots-0.20',
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 pixman = dependency('pixman-1')
+cairo = dependency('cairo')
 
 executable('livi-compositor',
   'livi-compositor.c',
-  dependencies: [wlroots, wayland_server, xkbcommon, pixman],
-  c_args: ['-DWLR_USE_UNSTABLE', '-D_POSIX_C_SOURCE=200809L'],
+  dependencies: [wlroots, wayland_server, xkbcommon, pixman, cairo],
+  c_args: ['-DWLR_USE_UNSTABLE', '-D_GNU_SOURCE'],
   install: false)

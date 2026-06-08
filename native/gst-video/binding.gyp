@@ -50,5 +50,24 @@
         } ]
       ]
     }
+  ],
+  "conditions": [
+    [ "OS=='linux'", {
+      "targets": [
+        {
+          # Standalone gst-host binary. Runs the pipeline outside the Electron
+          # executable so system libwayland binds ffi_call to the system libffi,
+          # not Electron's bundled copy (whose ffi_cif ABI differs and corrupts
+          # wayland event marshalling on resize).
+          "target_name": "livi-gst-host",
+          "type": "executable",
+          "defines": [ "LIVI_GST_HOST_STANDALONE" ],
+          "sources": [ "src/gst_video.cc" ],
+          "cflags": [ "<!@(pkg-config --cflags gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)" ],
+          "cflags_cc": [ "-std=c++17", "-fexceptions" ],
+          "libraries": [ "<!@(pkg-config --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)" ]
+        }
+      ]
+    } ]
   ]
 }

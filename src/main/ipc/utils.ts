@@ -141,6 +141,7 @@ export function saveSettings(runtimeState: runtimeStateProps, next: Partial<Conf
     const win = mainWindow
 
     if (process.env.LIVI_COMPOSITOR === '1') {
+      // The compositor owns the window size (tiled toplevel), so just drive fullscreen.
       if (kioskChanged) win.setFullScreen(nextMainKiosk)
       return
     }

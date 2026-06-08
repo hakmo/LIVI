@@ -10,6 +10,7 @@ import {
   applyAspectRatioWindowed,
   applyWindowedContentSize,
   attachKioskStateSync,
+  attachResizeReflow,
   currentKiosk,
   persistKioskAndBroadcast,
   sanitizeBounds
@@ -124,6 +125,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
 
   // keep in sync with WM
   attachKioskStateSync(runtimeState)
+  attachResizeReflow()
 
   const ses = mainWindow.webContents.session
   ses.setPermissionCheckHandler((_w, p) => ['usb', 'hid', 'media', 'display-capture'].includes(p))
@@ -154,8 +156,8 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
     const baseH = savedBounds?.height || runtimeState.config.height || 720
 
     // Windows kiosk is created already full-screen (no resize, see winKioskBounds); everyone
-    // else starts windowed.
-    if (!winKioskBounds) applyWindowedContentSize(mainWindow, baseW, baseH)
+    // else starts windowed. In compositor mode the compositor owns the size (tiled toplevel).
+    if (!winKioskBounds && !compositorMode) applyWindowedContentSize(mainWindow, baseW, baseH)
     mainWindow.show()
 
     // Snapshot the geometry

@@ -78,6 +78,8 @@ chmod +x LIVI-*-x86_64.AppImage
 
 On first launch, LIVI will detect if the udev rule for the USB dongle is missing and prompt you to install it automatically.
 
+> **Hardware video decode (optional):** LIVI uses the system VA-API driver for GPU video decode (it is not bundled, since it must match your GPU and kernel). Most desktops ship it, a minimal install may not. Without it LIVI still works via software decode. For HW decode install the driver for your GPU and verify with `vainfo`: `i965-va-driver` (older Intel, e.g. Broadwell), `intel-media-va-driver` (Gen9+ Intel), `mesa-va-drivers` (AMD).
+
 > **Ubuntu / Kubuntu users:** Due to AppArmor restrictions, use the `.deb` package instead of the AppImage. The `.deb` automatically configures all required permissions. Alternatively, the AppImage can be started with `--no-sandbox` as a workaround.
 
 ## Mac (arm64)
@@ -134,7 +136,7 @@ Make sure the following packages and tools are installed on your system before b
 - **libusb-1.0-0-dev** (required for `node-usb`)
 - **libudev-dev** (optional but recommended for USB detection on Linux)
 - **libgstreamer1.0-dev** + **libgstreamer-plugins-base1.0-dev** (required to build the `gst-video` addon)
-- **meson** (≥ 1.4), **ninja**, **pkg-config**, **bison** and **libegl-dev** / **libgles-dev** / **libgbm-dev** / **libffi-dev** / **libexpat1-dev** (Linux only: to build the embedded wlroots compositor)
+- **meson** (≥ 1.4), **ninja**, **pkg-config**, **bison**, **cmake** and the wlroots/EGL stack: **libwayland-dev**, **wayland-protocols**, **libxkbcommon-dev** (≥ 1.8.0), **libpixman-1-dev**, **libcairo2-dev**, **libegl-dev** / **libgles-dev** / **libgbm-dev** / **libffi-dev** / **libexpat1-dev** (Linux only: to build the embedded wlroots compositor)
 - **fuse** (required to run AppImages)
 
 On Debian/Ubuntu/Raspberry Pi OS, install everything with:
@@ -142,10 +144,11 @@ On Debian/Ubuntu/Raspberry Pi OS, install everything with:
 ```bash
 sudo apt-get update
 sudo apt-get install -y git build-essential python3 python3-dev python3-pip \
-  pkg-config bison ninja-build \
+  pkg-config bison ninja-build cmake \
   libusb-1.0-0-dev libudev-dev \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-  libegl-dev libgles-dev libgbm-dev libffi-dev libexpat1-dev
+  libegl-dev libgles-dev libgbm-dev libffi-dev libexpat1-dev \
+  libwayland-dev wayland-protocols libxkbcommon-dev libpixman-1-dev libcairo2-dev
 pip3 install --user --break-system-packages 'meson>=1.4'
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
@@ -158,6 +161,10 @@ On Fedora, install everything with:
 sudo dnf install -y git gcc gcc-c++ make python3 python3-devel \
   pkgconf-pkg-config libusb1-devel systemd-devel \
   gstreamer1-devel gstreamer1-plugins-base-devel \
+  meson ninja-build bison cmake \
+  wlroots-devel wayland-devel wayland-protocols-devel libxkbcommon-devel \
+  pixman-devel cairo-devel \
+  mesa-libEGL-devel mesa-libGLES-devel mesa-libgbm-devel libffi-devel expat-devel \
   fuse fuse-libs
 curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
 sudo dnf install -y nodejs

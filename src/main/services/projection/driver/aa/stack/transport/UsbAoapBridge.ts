@@ -348,6 +348,7 @@ export class UsbAoapBridge extends EventEmitter {
 
       if (!this._pumping || this._client !== sock) return
       if (!data || data.byteLength === 0) continue
+      if (sock.destroyed || sock.writable === false) return
 
       const buf = Buffer.from(data.buffer, data.byteOffset, data.byteLength)
       if (!sock.write(buf)) {

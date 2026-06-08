@@ -38,7 +38,6 @@ is_system_excluded() {
         */libc.so.*|*/libm.so.*|*/libmvec.so.*|*/libpthread.so.*|*/libdl.so.*|*/librt.so.*|\
     */libgcc_s.so.*|*/libstdc++.so.*|\
     */libpulse.so.*|*/libpulsecommon-*.so|*/libasound.so.*|\
-    */libglib-2.0.so.*|*/libgobject-2.0.so.*|*/libgio-2.0.so.*|*/libgmodule-2.0.so.*|\
     */libdbus-1.so.*|*/libsystemd.so.*|\
     */libX*.so.*|*/libxcb*.so.*|*/libwayland-*.so.*|\
     */libdrm.so.*|*/libgbm.so.*|*/libGL.so.*|*/libEGL.so.*|*/libGLESv2.so.*|\

@@ -979,7 +979,7 @@ export class Session extends EventEmitter {
     data.writeUInt16BE(VERSION.MAJOR, 0)
     data.writeUInt16BE(VERSION.MINOR, 2)
     const frame = encodeFrame(CH.CONTROL, FRAME_FLAGS.PLAINTEXT, CTRL_MSG.VERSION_REQUEST, data)
-    this._sock.write(frame)
+    this._writeSock(frame)
   }
 
   private async _onVersionResponse(payload: Buffer): Promise<void> {
@@ -1005,7 +1005,7 @@ export class Session extends EventEmitter {
 
   private async _startTls(): Promise<void> {
     this._tls = new SessionTls({
-      writeRaw: (frame) => this._sock.write(frame),
+      writeRaw: (frame) => this._writeSock(frame),
       onDecryptedMessage: (ch, fl, mid, p) => this._handleDecryptedMessage(ch, fl, mid, p),
       onSecureConnect: () => {
         this._transition(State.AUTH)
@@ -1231,6 +1231,12 @@ export class Session extends EventEmitter {
   // ── Frame sending ─────────────────────────────────────────────────────────
 
   // Send an AA frame. Encrypted (flags & 0x08) → TLS via tlsSocket
+
+  private _writeSock(frame: Buffer): void {
+    if (this._state === State.CLOSED || this._sock.writable === false) return
+    this._sock.write(frame)
+  }
+
   private _sendAA(channelId: number, flags: number, msgId: number, data: Buffer): void {
     const isEncrypted = (flags & 0x08) !== 0
 
@@ -1241,7 +1247,7 @@ export class Session extends EventEmitter {
           `[Session] sock→ PLAIN ch=${channelId} msgId=0x${msgId.toString(16).padStart(4, '0')} ${frame.length}B`
         )
       }
-      this._sock.write(frame)
+      this._writeSock(frame)
       return
     }
 

@@ -80,6 +80,7 @@ jest.mock('@main/window/utils', () => ({
   applyAspectRatioWindowed: jest.fn(),
   applyWindowedContentSize: jest.fn(),
   attachKioskStateSync: jest.fn(),
+  attachResizeReflow: jest.fn(),
   currentKiosk: jest.fn(() => false),
   persistKioskAndBroadcast: jest.fn(),
   sanitizeBounds: jest.fn((b) => b)

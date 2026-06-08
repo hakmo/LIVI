@@ -6,6 +6,8 @@
  * The host drives video placement/crop/visibility over a control socket.
  */
 #include <assert.h>
+#include <cairo/cairo.h>
+#include <drm_fourcc.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -21,6 +23,7 @@
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
+#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/render/allocator.h>
@@ -39,6 +42,7 @@
 #include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
@@ -51,6 +55,13 @@ enum tinywl_cursor_mode {
 
 // Each screen role gets its own non-overlapping x-slot in the scene
 #define LIVI_SCREEN_X_SLOT 100000
+
+// Compositor-drawn server-side decoration: a titlebar with the screen title and round minimize,
+// fullscreen and close buttons. Hidden in fullscreen/kiosk.
+#define LIVI_TITLEBAR_H 32
+#define LIVI_BTN_W 32
+#define LIVI_BTN_GAP 2
+#define LIVI_RESIZE_BORDER 8
 
 // Per-tag video config, cached until its tagged toplevel appears.
 #define LIVI_MAX_VIDEO_CFGS 16
@@ -72,13 +83,15 @@ struct tinywl_server {
 	struct wlr_allocator *allocator;
 	struct wlr_scene *scene;
 	struct wlr_scene_output_layout *scene_layout;
-	// fixed z-order layers (bottom -> top): backdrop, video planes, UI
+	// fixed z-order layers (bottom -> top): backdrop, video planes, UI, decoration
 	struct wlr_scene_tree *layer_bg;
 	struct wlr_scene_tree *layer_video;
 	struct wlr_scene_tree *layer_ui;
+	struct wlr_scene_tree *layer_deco;
 
 	struct wlr_xdg_shell *xdg_shell;
 	struct wl_listener new_xdg_toplevel;
+	struct wl_listener new_toplevel_decoration;
 	struct wl_listener new_xdg_popup;
 	struct wl_list toplevels;
 
@@ -146,8 +159,9 @@ struct tinywl_toplevel {
 	struct livi_screen *screen;
 	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_scene_tree *scene_tree;
+	struct wlr_xdg_toplevel_decoration_v1 *decoration;  // forced server-side on initial commit
 	bool is_video;
-	// video plane: tag (claim) + AA crop region; placed by apply_video_layout
+	// video plane: tag (claim) + AA crop region, placed by apply_video_layout
 	char tag[64];
 	bool has_crop;
 	double crop_l, crop_t, vis_w, vis_h, tier_w, tier_h;
@@ -191,7 +205,21 @@ struct livi_screen {
 	struct wlr_scene_rect *backdrop;
 	float backdrop_color[4];
 	bool has_backdrop_color;
+
+	// compositor-drawn titlebar (cairo), above the UI, hidden while fullscreen
+	struct wlr_scene_buffer *titlebar;   // dark rounded-top bar, re-drawn on width change
+	struct wlr_scene_buffer *title;      // screen title text
+	struct wlr_scene_buffer *btn_min;
+	struct wlr_scene_buffer *btn_fs;
+	struct wlr_scene_buffer *btn_close;
+	int titlebar_w;                      // last width the bar was drawn at
+	bool fullscreen;                 // host output is fullscreen -> no titlebar, UI fills
 };
+
+// Top inset the UI/video planes leave for the titlebar (0 while fullscreen).
+static int screen_top_inset(const struct livi_screen *s) {
+	return s->fullscreen ? 0 : LIVI_TITLEBAR_H;
+}
 
 static struct livi_screen *screen_by_role(struct tinywl_server *server, const char *role) {
 	for (int i = 0; i < server->n_screens; i++) {
@@ -229,6 +257,8 @@ static struct tinywl_toplevel *find_video_by_tag(struct tinywl_server *server,
 }
 
 static void apply_video_layout(struct tinywl_toplevel *video);
+static void apply_ui_layout(struct livi_screen *s);
+static void livi_toggle_fullscreen(struct livi_screen *s);
 
 static struct livi_video_cfg *cfg_for_tag(struct tinywl_server *server, const char *tag,
 		bool create) {
@@ -329,6 +359,13 @@ static bool handle_keybinding(struct tinywl_server *server, xkb_keysym_t sym) {
 			wl_container_of(server->toplevels.prev, next_toplevel, link);
 		focus_toplevel(next_toplevel);
 		break;
+	case XKB_KEY_F11:
+		// Toggle fullscreen on the main screen. The titlebar button only enters fullscreen
+		// (it is hidden once fullscreen), so this is how you leave it from the keyboard.
+		if (server->n_screens > 0) {
+			livi_toggle_fullscreen(&server->screens[0]);
+		}
+		break;
 	default:
 		return false;
 	}
@@ -406,7 +443,7 @@ static void server_new_keyboard(struct tinywl_server *server,
 static void server_new_pointer(struct tinywl_server *server,
 		struct wlr_input_device *device) {
 	wlr_cursor_attach_input_device(server->cursor, device);
-	// each nested output has its own pointer; pin it to that output's region
+	// each nested output has its own pointer, pin it to that output's region
 	struct wlr_pointer *pointer = wlr_pointer_from_input_device(device);
 	struct livi_screen *s = screen_for_output_name(server, pointer->output_name);
 	if (s != NULL && s->wlr_output != NULL) {
@@ -426,7 +463,7 @@ static void server_new_input(struct wl_listener *listener, void *data) {
 		server_new_pointer(server, device);
 		break;
 	case WLR_INPUT_DEVICE_TOUCH:
-		/* LIVI: the head unit is a touchscreen; route touch through the cursor */
+		/* LIVI: the head unit is a touchscreen, route touch through the cursor */
 		wlr_cursor_attach_input_device(server->cursor, device);
 		server->has_touch = true;
 		break;
@@ -547,12 +584,81 @@ static void process_cursor_resize(struct tinywl_server *server) {
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
 }
 
+// Hit-test the compositor decoration. Returns the screen the point is over (NULL if none) and,
+// for a resize border, the edge bitmask. Buttons and the titlebar live in the top bar, resize
+// borders run along the left, right and bottom edges. Coords are layout space.
+enum livi_deco_hit {
+	LIVI_DECO_NONE, LIVI_DECO_MIN, LIVI_DECO_FS, LIVI_DECO_CLOSE, LIVI_DECO_MOVE, LIVI_DECO_RESIZE
+};
+
+static enum livi_deco_hit deco_hit_test(struct tinywl_server *server, double lx, double ly,
+		struct livi_screen **out, uint32_t *out_edges) {
+	*out = NULL;
+	*out_edges = 0;
+	for (int i = 0; i < server->n_screens; i++) {
+		struct livi_screen *s = &server->screens[i];
+		if (s->fullscreen || s->width <= 0 || s->height <= 0) {
+			continue;
+		}
+		if (lx < s->x || lx >= s->x + s->width || ly < 0 || ly >= s->height) {
+			continue;
+		}
+		double lxw = lx - s->x;
+		uint32_t edges = 0;
+		if (ly >= s->height - LIVI_RESIZE_BORDER) edges |= WLR_EDGE_BOTTOM;
+		if (lxw < LIVI_RESIZE_BORDER) edges |= WLR_EDGE_LEFT;
+		if (lxw >= s->width - LIVI_RESIZE_BORDER) edges |= WLR_EDGE_RIGHT;
+
+		if (ly < LIVI_TITLEBAR_H) {
+			// titlebar: buttons first (full-height touch slots), then resize borders, else move
+			int slot = LIVI_BTN_W + LIVI_BTN_GAP;
+			int close_x = s->x + s->width - 1 * slot;
+			int fs_x = s->x + s->width - 2 * slot;
+			int min_x = s->x + s->width - 3 * slot;
+			if (lx >= close_x && lx < close_x + LIVI_BTN_W) { *out = s; return LIVI_DECO_CLOSE; }
+			if (lx >= fs_x && lx < fs_x + LIVI_BTN_W) { *out = s; return LIVI_DECO_FS; }
+			if (lx >= min_x && lx < min_x + LIVI_BTN_W) { *out = s; return LIVI_DECO_MIN; }
+			if (edges != 0) { *out = s; *out_edges = edges; return LIVI_DECO_RESIZE; }
+			*out = s;
+			return LIVI_DECO_MOVE;
+		}
+		if (edges != 0) { *out = s; *out_edges = edges; return LIVI_DECO_RESIZE; }
+		return LIVI_DECO_NONE;   // inside the UI surface
+	}
+	return LIVI_DECO_NONE;
+}
+
+// xcursor name for a resize-edge bitmask (only bottom/left/right + bottom corners are used).
+static const char *resize_cursor_name(uint32_t edges) {
+	bool b = (edges & WLR_EDGE_BOTTOM) != 0;
+	bool l = (edges & WLR_EDGE_LEFT) != 0;
+	bool r = (edges & WLR_EDGE_RIGHT) != 0;
+	if (b && l) return "sw-resize";
+	if (b && r) return "se-resize";
+	if (b) return "s-resize";
+	if (l) return "w-resize";
+	if (r) return "e-resize";
+	return "default";
+}
+
 static void process_cursor_motion(struct tinywl_server *server, uint32_t time) {
 	if (server->cursor_mode == TINYWL_CURSOR_MOVE) {
 		process_cursor_move(server);
 		return;
 	} else if (server->cursor_mode == TINYWL_CURSOR_RESIZE) {
 		process_cursor_resize(server);
+		return;
+	}
+
+	// Decoration hover feedback: resize cursors over the borders, default over the titlebar.
+	struct livi_screen *ds = NULL;
+	uint32_t dedges = 0;
+	enum livi_deco_hit dh = deco_hit_test(server, server->cursor->x, server->cursor->y,
+			&ds, &dedges);
+	if (ds != NULL) {
+		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr,
+			dh == LIVI_DECO_RESIZE ? resize_cursor_name(dedges) : "default");
+		wlr_seat_pointer_clear_focus(server->seat);
 		return;
 	}
 
@@ -595,6 +701,42 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
 	struct tinywl_server *server =
 		wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
+
+	// Clicks on our decoration are consumed here and never forwarded to a surface. Move and
+	// resize are handed to the host compositor, which performs the interactive grab.
+	struct livi_screen *deco_screen = NULL;
+	uint32_t deco_edges = 0;
+	enum livi_deco_hit hit = deco_hit_test(server,
+			server->cursor->x, server->cursor->y, &deco_screen, &deco_edges);
+	if (deco_screen != NULL) {
+		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			struct wlr_output *o = deco_screen->wlr_output;
+			bool is_wl = o != NULL && wlr_output_is_wl(o);
+			switch (hit) {
+			case LIVI_DECO_CLOSE:
+				if (deco_screen->ui != NULL) {
+					wlr_xdg_toplevel_send_close(deco_screen->ui->xdg_toplevel);
+				}
+				break;
+			case LIVI_DECO_MIN:
+				if (is_wl) wlr_wl_output_set_minimized(o);
+				break;
+			case LIVI_DECO_FS:
+				livi_toggle_fullscreen(deco_screen);
+				break;
+			case LIVI_DECO_MOVE:
+				if (is_wl) wlr_wl_output_begin_move(o);
+				break;
+			case LIVI_DECO_RESIZE:
+				if (is_wl) wlr_wl_output_begin_resize(o, deco_edges);
+				break;
+			default:
+				break;
+			}
+		}
+		return;
+	}
+
 	wlr_seat_pointer_notify_button(server->seat,
 			event->time_msec, event->button, event->state);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
@@ -623,7 +765,7 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_pointer_notify_frame(server->seat);
 }
 
-/* LIVI: touch. Event coords are [0,1] over the output the touch came from; map to that
+/* LIVI: touch. Event coords are [0,1] over the output the touch came from, map to that
  * output's screen and scale by its size to find the surface under the touch point. */
 static void server_touch_down(struct wl_listener *listener, void *data) {
 	struct tinywl_server *server = wl_container_of(listener, server, touch_down);
@@ -695,19 +837,18 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 	if (s == NULL || !video->xdg_toplevel->base->initialized) {
 		return;
 	}
-	int ow = s->width, oh = s->height;
+	int top = screen_top_inset(s);
+	int ow = s->width, oh = s->height - top;   // area below the titlebar
 	if (ow <= 0 || oh <= 0) {
 		return;
 	}
 	if (!video->has_crop || video->vis_w <= 0 || video->vis_h <= 0 ||
 			video->tier_w <= 0 || video->tier_h <= 0) {
 		wlr_xdg_toplevel_set_size(video->xdg_toplevel, ow, oh);
-		wlr_scene_node_set_position(&video->scene_tree->node, s->x, 0);
-		wlr_log(WLR_INFO, "livi[%s/%s]: video fill output %dx%d pos %d,0",
-			s->role, video->tag, ow, oh, s->x);
+		wlr_scene_node_set_position(&video->scene_tree->node, s->x, top);
 		return;
 	}
-	/* contain the content into the output (uniform scale; bars only on AR mismatch) */
+	/* contain the content into the output (uniform scale, bars only on AR mismatch) */
 	double scx = (double)ow / video->vis_w;
 	double scy = (double)oh / video->vis_h;
 	double scale = scx < scy ? scx : scy;
@@ -716,13 +857,202 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 	int tw = (int)lround(video->tier_w * scale);
 	int th = (int)lround(video->tier_h * scale);
 	int px = (int)lround(s->x + off_x - video->crop_l * scale);
-	int py = (int)lround(off_y - video->crop_t * scale);
+	int py = (int)lround(top + off_y - video->crop_t * scale);
 	wlr_xdg_toplevel_set_size(video->xdg_toplevel, tw, th);
 	wlr_scene_node_set_position(&video->scene_tree->node, px, py);
-	wlr_log(WLR_INFO,
-		"livi[%s/%s]: video crop content=%gx%g tier=%gx%g crop=%g,%g output=%dx%d -> size %dx%d pos %d,%d",
-		s->role, video->tag, video->vis_w, video->vis_h, video->tier_w, video->tier_h,
-		video->crop_l, video->crop_t, ow, oh, tw, th, px, py);
+}
+
+// Wrap a cairo ARGB32 image surface as a wlr_buffer so it can live in the scene graph.
+struct livi_deco_buffer {
+	struct wlr_buffer base;
+	cairo_surface_t *surface;
+};
+
+static void livi_deco_buffer_destroy(struct wlr_buffer *buffer) {
+	struct livi_deco_buffer *b = wl_container_of(buffer, b, base);
+	cairo_surface_destroy(b->surface);
+	free(b);
+}
+
+static bool livi_deco_buffer_begin_data_ptr_access(struct wlr_buffer *buffer, uint32_t flags,
+		void **data, uint32_t *format, size_t *stride) {
+	(void)flags;
+	struct livi_deco_buffer *b = wl_container_of(buffer, b, base);
+	*data = cairo_image_surface_get_data(b->surface);
+	*format = DRM_FORMAT_ARGB8888;
+	*stride = cairo_image_surface_get_stride(b->surface);
+	return true;
+}
+
+static void livi_deco_buffer_end_data_ptr_access(struct wlr_buffer *buffer) {
+	(void)buffer;
+}
+
+static const struct wlr_buffer_impl livi_deco_buffer_impl = {
+	.destroy = livi_deco_buffer_destroy,
+	.begin_data_ptr_access = livi_deco_buffer_begin_data_ptr_access,
+	.end_data_ptr_access = livi_deco_buffer_end_data_ptr_access,
+};
+
+// Take ownership of a drawn cairo surface and hand it to a scene buffer.
+static void livi_scene_set_cairo(struct wlr_scene_buffer *sb, cairo_surface_t *surface) {
+	struct livi_deco_buffer *b = calloc(1, sizeof(*b));
+	if (b == NULL) {
+		cairo_surface_destroy(surface);
+		return;
+	}
+	b->surface = surface;
+	wlr_buffer_init(&b->base, &livi_deco_buffer_impl,
+		cairo_image_surface_get_width(surface), cairo_image_surface_get_height(surface));
+	wlr_scene_buffer_set_buffer(sb, &b->base);
+	wlr_buffer_drop(&b->base);
+}
+
+enum livi_btn_sym { LIVI_SYM_MIN, LIVI_SYM_FS, LIVI_SYM_CLOSE };
+
+// A round, monochrome window-control button (subtle light disc + a light glyph), like the
+// typical GNOME controls. The slot is w x h, the disc is centred.
+static cairo_surface_t *livi_draw_button(enum livi_btn_sym sym, int w, int h) {
+	cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	cairo_t *cr = cairo_create(s);
+	double cx = w / 2.0, cy = h / 2.0;
+	double rad = h * 0.34;   // disc radius, independent of the slot width
+	cairo_arc(cr, cx, cy, rad, 0, 2 * M_PI);
+	cairo_set_source_rgba(cr, 1, 1, 1, 0.10);
+	cairo_fill(cr);
+
+	cairo_set_source_rgba(cr, 1, 1, 1, 0.80);
+	cairo_set_line_width(cr, 1.5);
+	cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+	cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+	double g = rad * 0.33;   // glyph half-extent, leaves clear padding to the disc edge
+	switch (sym) {
+	case LIVI_SYM_CLOSE:
+		cairo_move_to(cr, cx - g, cy - g); cairo_line_to(cr, cx + g, cy + g);
+		cairo_move_to(cr, cx + g, cy - g); cairo_line_to(cr, cx - g, cy + g);
+		cairo_stroke(cr);
+		break;
+	case LIVI_SYM_MIN:
+		cairo_move_to(cr, cx - g, cy); cairo_line_to(cr, cx + g, cy);
+		cairo_stroke(cr);
+		break;
+	case LIVI_SYM_FS: {
+		double e = g * 0.8;   // corner-bracket leg length
+		// bracket in the top-left corner
+		cairo_move_to(cr, cx - g + e, cy - g); cairo_line_to(cr, cx - g, cy - g);
+		cairo_line_to(cr, cx - g, cy - g + e);
+		// bracket in the bottom-right corner
+		cairo_move_to(cr, cx + g - e, cy + g); cairo_line_to(cr, cx + g, cy + g);
+		cairo_line_to(cr, cx + g, cy + g - e);
+		cairo_stroke(cr);
+		break;
+	}
+	}
+	cairo_destroy(cr);
+	cairo_surface_flush(s);
+	return s;
+}
+
+// The screen's title text, light on transparent, vertically centred in a h-tall strip.
+static cairo_surface_t *livi_draw_title(const char *text, int h) {
+	cairo_surface_t *probe = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
+	cairo_t *pc = cairo_create(probe);
+	cairo_select_font_face(pc, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	double fsize = h * 0.5;
+	cairo_set_font_size(pc, fsize);
+	cairo_text_extents_t ext;
+	cairo_text_extents(pc, text, &ext);
+	cairo_destroy(pc);
+	cairo_surface_destroy(probe);
+
+	int w = (int)ceil(ext.width) + 4;
+	if (w < 1) w = 1;
+	cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	cairo_t *cr = cairo_create(s);
+	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	cairo_set_font_size(cr, fsize);
+	cairo_set_source_rgba(cr, 1, 1, 1, 0.85);
+	cairo_move_to(cr, 2 - ext.x_bearing, (h - ext.height) / 2.0 - ext.y_bearing);
+	cairo_show_text(cr, text);
+	cairo_destroy(cr);
+	cairo_surface_flush(s);
+	return s;
+}
+
+// The titlebar background: a flat dark bar
+static cairo_surface_t *livi_draw_titlebar(int w, int h) {
+	cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	cairo_t *cr = cairo_create(s);
+	cairo_set_source_rgba(cr, 0.13, 0.13, 0.16, 1.0);
+	cairo_paint(cr);
+	cairo_destroy(cr);
+	cairo_surface_flush(s);
+	return s;
+}
+
+// Lay out a screen's UI plane and its titlebar. Windowed: titlebar on top, UI pushed down by
+// its height. Fullscreen/kiosk: titlebar hidden, UI fills the whole output.
+static void apply_ui_layout(struct livi_screen *s) {
+	if (s == NULL) {
+		return;
+	}
+	int ow = s->width, oh = s->height;
+	if (ow <= 0 || oh <= 0) {
+		return;
+	}
+	bool show = !s->fullscreen;
+	int top = screen_top_inset(s);
+	int slot = LIVI_BTN_W + LIVI_BTN_GAP;
+
+	if (s->titlebar != NULL) {
+		wlr_scene_node_set_enabled(&s->titlebar->node, show);
+		wlr_scene_node_set_position(&s->titlebar->node, s->x, 0);
+		if (show && ow != s->titlebar_w) {
+			livi_scene_set_cairo(s->titlebar, livi_draw_titlebar(ow, LIVI_TITLEBAR_H));
+			s->titlebar_w = ow;
+		}
+	}
+	if (s->title != NULL) {
+		wlr_scene_node_set_enabled(&s->title->node, show);
+		wlr_scene_node_set_position(&s->title->node, s->x + 12, 0);
+	}
+	if (s->btn_close != NULL) {
+		wlr_scene_node_set_enabled(&s->btn_close->node, show);
+		wlr_scene_node_set_position(&s->btn_close->node, s->x + ow - 1 * slot, 0);
+	}
+	if (s->btn_fs != NULL) {
+		wlr_scene_node_set_enabled(&s->btn_fs->node, show);
+		wlr_scene_node_set_position(&s->btn_fs->node, s->x + ow - 2 * slot, 0);
+	}
+	if (s->btn_min != NULL) {
+		wlr_scene_node_set_enabled(&s->btn_min->node, show);
+		wlr_scene_node_set_position(&s->btn_min->node, s->x + ow - 3 * slot, 0);
+	}
+
+	if (s->ui != NULL && s->ui->xdg_toplevel->base->initialized) {
+		wlr_scene_node_set_position(&s->ui->scene_tree->node, s->x, top);
+		// Tiled on all edges so the client renders exactly our size, not its own floating size.
+		wlr_xdg_toplevel_set_tiled(s->ui->xdg_toplevel,
+			WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT);
+		wlr_xdg_toplevel_set_size(s->ui->xdg_toplevel, ow, oh - top);
+	}
+}
+
+// Toggle the host output between windowed (with titlebar) and fullscreen. Reflected onto the
+// inner Electron toplevel so its kiosk/UI state follows.
+static void livi_toggle_fullscreen(struct livi_screen *s) {
+	if (s == NULL || s->ui == NULL) {
+		return;
+	}
+	bool want = !s->fullscreen;
+	s->fullscreen = want;
+	if (s->wlr_output != NULL && wlr_output_is_wl(s->wlr_output)) {
+		wlr_wl_output_set_fullscreen(s->wlr_output, want);
+	}
+	if (s->ui->xdg_toplevel->base->initialized) {
+		wlr_xdg_toplevel_set_fullscreen(s->ui->xdg_toplevel, want);
+	}
+	apply_ui_layout(s);
 }
 
 static void output_request_state(struct wl_listener *listener, void *data) {
@@ -743,10 +1073,7 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 			apply_video_layout(v);
 		}
 	}
-	if (s->ui != NULL && s->ui->xdg_toplevel->base->initialized) {
-		wlr_xdg_toplevel_set_size(s->ui->xdg_toplevel, s->width, s->height);
-		wlr_scene_node_set_position(&s->ui->scene_tree->node, s->x, 0);
-	}
+	apply_ui_layout(s);
 	if (s->backdrop) {
 		wlr_scene_rect_set_size(s->backdrop, s->width, s->height);
 	}
@@ -761,6 +1088,18 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 		if (s->backdrop != NULL) {
 			wlr_scene_node_destroy(&s->backdrop->node);
 			s->backdrop = NULL;
+		}
+		if (s->titlebar != NULL) {
+			wlr_scene_node_destroy(&s->titlebar->node);
+			s->titlebar = NULL;
+		}
+		if (s->btn_fs != NULL) {
+			wlr_scene_node_destroy(&s->btn_fs->node);
+			s->btn_fs = NULL;
+		}
+		if (s->btn_close != NULL) {
+			wlr_scene_node_destroy(&s->btn_close->node);
+			s->btn_close = NULL;
 		}
 		if (s == &output->server->screens[0]) {
 			/* LIVI: the main window is gone -> the app is closing, take everything down */
@@ -816,7 +1155,7 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	}
 	wlr_output_state_set_custom_mode(&state, ow, oh, 0);
 
-	/* LIVI: bind to the host-requested screen (NULL -> main); each role keeps its own
+	/* LIVI: bind to the host-requested screen (NULL -> main), each role keeps its own
 	 * x-slot so its nested window renders just that screen's content */
 	struct livi_screen *s = server->pending_screen ? server->pending_screen
 		: &server->screens[0];
@@ -869,11 +1208,24 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	s->backdrop = wlr_scene_rect_create(server->layer_bg, s->width, s->height, color);
 	wlr_scene_node_set_position(&s->backdrop->node, s->x, 0);
 
-	/* a UI/video toplevel may have mapped before this output existed; reflow onto it now */
-	if (s->ui != NULL && s->ui->xdg_toplevel->base->initialized) {
-		wlr_scene_node_set_position(&s->ui->scene_tree->node, s->x, 0);
-		wlr_xdg_toplevel_set_size(s->ui->xdg_toplevel, s->width, s->height);
-	}
+	/* compositor-drawn titlebar + title + round controls, cairo-rendered. Created bottom-up so
+	 * the title and buttons sit above the bar; apply_ui_layout places them and draws the bar. */
+	s->titlebar = wlr_scene_buffer_create(server->layer_deco, NULL);
+	s->title = wlr_scene_buffer_create(server->layer_deco, NULL);
+	s->btn_min = wlr_scene_buffer_create(server->layer_deco, NULL);
+	s->btn_fs = wlr_scene_buffer_create(server->layer_deco, NULL);
+	s->btn_close = wlr_scene_buffer_create(server->layer_deco, NULL);
+	if (s->title != NULL)
+		livi_scene_set_cairo(s->title, livi_draw_title(role_title(s->role), LIVI_TITLEBAR_H));
+	if (s->btn_min != NULL)
+		livi_scene_set_cairo(s->btn_min, livi_draw_button(LIVI_SYM_MIN, LIVI_BTN_W, LIVI_TITLEBAR_H));
+	if (s->btn_fs != NULL)
+		livi_scene_set_cairo(s->btn_fs, livi_draw_button(LIVI_SYM_FS, LIVI_BTN_W, LIVI_TITLEBAR_H));
+	if (s->btn_close != NULL)
+		livi_scene_set_cairo(s->btn_close, livi_draw_button(LIVI_SYM_CLOSE, LIVI_BTN_W, LIVI_TITLEBAR_H));
+
+	/* a UI/video toplevel may have mapped before this output existed, reflow onto it now */
+	apply_ui_layout(s);
 	struct tinywl_toplevel *v;
 	wl_list_for_each(v, &server->videos, video_link) {
 		if (v->screen == s) {
@@ -900,13 +1252,8 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 		return;
 	}
 
-	/* UI plane: pin it to its screen's x-offset, fill the screen, then focus it */
-	if (s) {
-		wlr_scene_node_set_position(&toplevel->scene_tree->node, s->x, 0);
-		if (s->width > 0 && s->height > 0) {
-			wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, s->width, s->height);
-		}
-	}
+	/* UI plane: pin it under its screen's titlebar, size it to fit, then focus it */
+	apply_ui_layout(s);
 	focus_toplevel(toplevel);
 }
 
@@ -925,8 +1272,13 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	struct tinywl_server *server = toplevel->server;
 
 	if (toplevel->xdg_toplevel->base->initial_commit && toplevel->screen == NULL) {
+		// surface initialized: now safe to force the server-side decoration mode
+		if (toplevel->decoration != NULL) {
+			wlr_xdg_toplevel_decoration_v1_set_mode(toplevel->decoration,
+				WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+		}
 		// classify + route: Electron UI windows use app_id "livi" (routed by their
-		// "livi:<role>" title, untitled -> main); video planes are waylandsink with
+		// "livi:<role>" title, untitled -> main), video planes are waylandsink with
 		// app_id "livi-video" and carry the claim tag.
 		const char *app_id = toplevel->xdg_toplevel->app_id;
 		const char *title = toplevel->xdg_toplevel->title;
@@ -945,7 +1297,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		} else {
 			toplevel->is_video = true;
 			if (server->n_pending_video_tags > 0) {
-				// take the oldest claim (FIFO; claims arrive in plane-creation order)
+				// take the oldest claim (FIFO, claims arrive in plane-creation order)
 				snprintf(toplevel->tag, sizeof(toplevel->tag), "%s",
 					server->pending_video_tags[0]);
 				for (int i = 1; i < server->n_pending_video_tags; i++) {
@@ -966,10 +1318,14 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			app_id ? app_id : "(null)", title ? title : "(null)", toplevel->tag,
 			toplevel->is_video ? "video" : "ui", s->role);
 
-		/* the transparent UI and each video plane span their screen initially */
-		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, s->width, s->height);
+		/* lay the new plane out: UI gets a titlebar, video fills the area below it */
+		if (toplevel->is_video) {
+			apply_video_layout(toplevel);
+		} else {
+			apply_ui_layout(s);
+		}
 
-		/* a videocfg/videoshow may have arrived before this surface existed; apply it */
+		/* a videocfg/videoshow may have arrived before this surface existed, apply it */
 		if (toplevel->is_video && toplevel->tag[0]) {
 			struct livi_video_cfg *cfg = cfg_for_tag(server, toplevel->tag, false);
 			if (cfg != NULL) {
@@ -989,7 +1345,7 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	if (s != NULL && s->ui == toplevel) {
 		s->ui = NULL;
 		/* LIVI: the main UI quit -> the app is closing, terminate the loop. On a normal
-		 * close this exits; on a "restart" (full_restart set) main() re-execs us. */
+		 * close this exits, on a "restart" (full_restart set) main() re-execs us. */
 		if (toplevel->server->n_screens > 0 && s == &toplevel->server->screens[0]) {
 			wlr_log(WLR_INFO, "livi: main UI toplevel gone -> shutting down");
 			wl_display_terminate(toplevel->server->wl_display);
@@ -1010,7 +1366,7 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 
 static void begin_interactive(struct tinywl_toplevel *toplevel,
 		enum tinywl_cursor_mode mode, uint32_t edges) {
-	// clients never move/resize themselves; the host window resizes, we reflow
+	// clients never move/resize themselves, the host window resizes, we reflow
 	(void)toplevel;
 	(void)mode;
 	(void)edges;
@@ -1051,10 +1407,9 @@ static void xdg_toplevel_request_fullscreen(
 		if (s->ui == toplevel && s->wlr_output != NULL &&
 				wlr_output_is_wl(s->wlr_output)) {
 			wlr_wl_output_set_fullscreen(s->wlr_output, want);
-			// Force the inner UI to the output size when entering fullscreen
-			if (want && toplevel->xdg_toplevel->base->initialized) {
-				wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, s->width, s->height);
-			}
+			// Track the mode so the titlebar shows/hides, then re-lay the UI for it.
+			s->fullscreen = want;
+			apply_ui_layout(s);
 			wlr_log(WLR_INFO, "livi: request_fullscreen=%d screen '%s' output %dx%d",
 				want, s->role, s->width, s->height);
 			break;
@@ -1065,6 +1420,24 @@ static void xdg_toplevel_request_fullscreen(
 		/* Reflect fullscreen onto the inner toplevel too, so Electron confirms it and the
 		 * app keeps its kiosk/UI state in sync (its enter/leave-full-screen fires). */
 		wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, want);
+	}
+}
+
+// Force server-side decorations so Electron does not use its crash-prone GTK client-side
+// decoration path. The compositor draws the titlebar itself (apply_ui_layout).
+static void server_new_toplevel_decoration(struct wl_listener *listener, void *data) {
+	(void)listener;
+	struct wlr_xdg_toplevel_decoration_v1 *deco = data;
+	// set_mode asserts before the surface is initialized, so defer to the initial commit unless
+	// the surface is already up.
+	struct wlr_scene_tree *tree = deco->toplevel->base->data;
+	struct tinywl_toplevel *toplevel = tree ? tree->node.data : NULL;
+	if (toplevel != NULL) {
+		toplevel->decoration = deco;
+	}
+	if (deco->toplevel->base->initialized) {
+		wlr_xdg_toplevel_decoration_v1_set_mode(deco,
+			WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 	}
 }
 
@@ -1330,7 +1703,7 @@ static void ctrl_init(struct tinywl_server *server) {
 		wlr_log(WLR_ERROR, "livi: control socket() failed: %s", strerror(errno));
 		return;
 	}
-	/* the listen fd is created before forking the UI; keep it out of the child */
+	/* the listen fd is created before forking the UI, keep it out of the child */
 	fcntl(fd, F_SETFD, FD_CLOEXEC);
 	struct sockaddr_un addr = {0};
 	addr.sun_family = AF_UNIX;
@@ -1352,7 +1725,7 @@ static void ctrl_init(struct tinywl_server *server) {
 	wlr_log(WLR_INFO, "livi: control socket at %s", path);
 }
 
-// autocreate returns a multi-backend; grab the nested wayland sub-backend so we can
+// autocreate returns a multi-backend, grab the nested wayland sub-backend so we can
 // open more outputs at runtime
 static void find_wl_backend(struct wlr_backend *backend, void *data) {
 	struct tinywl_server *server = data;
@@ -1363,6 +1736,7 @@ static void find_wl_backend(struct wlr_backend *backend, void *data) {
 
 int main(int argc, char *argv[]) {
 	wlr_log_init(getenv("LIVI_WLR_DEBUG") ? WLR_DEBUG : WLR_INFO, NULL);
+
 	char *startup_cmd = NULL;
 
 	int c;
@@ -1383,7 +1757,7 @@ int main(int argc, char *argv[]) {
 
 	struct tinywl_server server = {0};
 
-	/* LIVI: known screen roles from LIVI_SCREENS; outputs are opened on demand per role */
+	/* LIVI: known screen roles from LIVI_SCREENS, outputs are opened on demand per role */
 	char screens_buf[256];
 	const char *screens_env = getenv("LIVI_SCREENS");
 	snprintf(screens_buf, sizeof(screens_buf), "%s",
@@ -1438,10 +1812,11 @@ int main(int argc, char *argv[]) {
 
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
-	// created in z-order: backdrop (bottom), video planes, UI (top)
+	// created in z-order: backdrop (bottom), video planes, UI, decoration (top)
 	server.layer_bg = wlr_scene_tree_create(&server.scene->tree);
 	server.layer_video = wlr_scene_tree_create(&server.scene->tree);
 	server.layer_ui = wlr_scene_tree_create(&server.scene->tree);
+	server.layer_deco = wlr_scene_tree_create(&server.scene->tree);
 
 	wl_list_init(&server.toplevels);
 	wl_list_init(&server.videos);
@@ -1450,6 +1825,13 @@ int main(int argc, char *argv[]) {
 	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
 	server.new_xdg_popup.notify = server_new_xdg_popup;
 	wl_signal_add(&server.xdg_shell->events.new_popup, &server.new_xdg_popup);
+
+	/* advertise xdg-decoration + force server-side so Electron skips its client-side path */
+	struct wlr_xdg_decoration_manager_v1 *xdg_decoration =
+		wlr_xdg_decoration_manager_v1_create(server.wl_display);
+	server.new_toplevel_decoration.notify = server_new_toplevel_decoration;
+	wl_signal_add(&xdg_decoration->events.new_toplevel_decoration,
+		&server.new_toplevel_decoration);
 
 	server.cursor = wlr_cursor_create();
 	wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
@@ -1543,6 +1925,7 @@ int main(int argc, char *argv[]) {
 
 	wl_list_remove(&server.new_xdg_toplevel.link);
 	wl_list_remove(&server.new_xdg_popup.link);
+	wl_list_remove(&server.new_toplevel_decoration.link);
 
 	wl_list_remove(&server.cursor_motion.link);
 	wl_list_remove(&server.cursor_motion_absolute.link);
@@ -1561,6 +1944,14 @@ int main(int argc, char *argv[]) {
 
 	wl_list_remove(&server.new_output.link);
 
+	// the backdrop + titlebar rects are freed by the scene-tree destroy below, null them so
+	// output_destroy (via wlr_backend_destroy) does not double-free
+	for (int i = 0; i < server.n_screens; i++) {
+		server.screens[i].backdrop = NULL;
+		server.screens[i].titlebar = NULL;
+		server.screens[i].btn_fs = NULL;
+		server.screens[i].btn_close = NULL;
+	}
 	wlr_scene_node_destroy(&server.scene->tree.node);
 	wlr_xcursor_manager_destroy(server.cursor_mgr);
 	wlr_cursor_destroy(server.cursor);

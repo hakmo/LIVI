@@ -1,13 +1,25 @@
+#ifndef LIVI_GST_HOST_STANDALONE
 #include <node_api.h>
+#endif
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/base/gstbasesink.h>
 #include <gst/video/videooverlay.h>
 #include <gst/video/video.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 #include <string>
+#ifdef __linux__
+#include <execinfo.h>
+#include <fcntl.h>
+#include <glib-unix.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#endif
 
 // Native window attach is platform-specific: the macOS (Cocoa) implementation lives in
 // gst_video_mac.mm, the Windows (Win32) one in gst_video_win.cc. Both put the video in a
@@ -188,7 +200,7 @@ static const char* pick_decoder(std::initializer_list<const char*> cands) {
   return last;
 }
 
-// Software decoders (everything else — vtdec/v4l2*/va*/d3d11* — is HW)
+// Software decoders (everything else, vtdec/v4l2*/va*/d3d11*, is HW)
 static bool is_hw_decoder(const char* name) {
   if (!name || !*name) return false;
   if (strncmp(name, "avdec_", 6) == 0) return false;
@@ -197,6 +209,7 @@ static bool is_hw_decoder(const char* name) {
   return true;
 }
 
+#ifndef LIVI_GST_HOST_STANDALONE
 static bool factory_exists(const char* name) {
   GstElementFactory* f = name && *name ? gst_element_factory_find(name) : nullptr;
   if (f) {
@@ -213,6 +226,7 @@ static const char* sw_decoder_for(const std::string& c) {
   if (c == "av1") return "dav1ddec";
   return "avdec_h264";
 }
+#endif
 
 // Best available decoder per codec, HW-first then software fallback. Adapts at
 // runtime: Pi5 stateless v4l2sl, Pi4 v4l2, x86 VA-API, mac vtdec, win d3d11
@@ -266,6 +280,7 @@ static std::string caps_for(const std::string& c) {
   return "video/x-h264,stream-format=byte-stream";
 }
 
+#ifndef LIVI_GST_HOST_STANDALONE
 static std::string get_string_arg(napi_env env, napi_value v) {
   size_t len = 0;
   napi_get_value_string_utf8(env, v, NULL, 0, &len);
@@ -305,9 +320,9 @@ static napi_value ProbeCodecs(napi_env env, napi_callback_info info) {
   }
   return obj;
 }
+#endif
 
-static void player_finalize(napi_env env, void* data, void* hint) {
-  Player* p = static_cast<Player*>(data);
+static void livi_free_player(Player* p) {
   if (!p) return;
   if (p->pipeline) {
     gst_element_set_state(p->pipeline, GST_STATE_NULL);
@@ -319,25 +334,18 @@ static void player_finalize(napi_env env, void* data, void* hint) {
   delete p;
 }
 
+#ifndef LIVI_GST_HOST_STANDALONE
+static void player_finalize(napi_env env, void* data, void* hint) {
+  (void)env;
+  (void)hint;
+  livi_free_player(static_cast<Player*>(data));
+}
+#endif
+
 // createPlayer(codec: string, windowHandle: Buffer) -> external
-static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
-  ensure_init();
-
-  size_t argc = 2;
-  napi_value argv[2];
-  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-
-  std::string codec = argc >= 1 ? get_string_arg(env, argv[0]) : "h264";
-
-  guintptr handle = 0;
-  if (argc >= 2) {
-    void* data = nullptr;
-    size_t len = 0;
-    if (napi_get_buffer_info(env, argv[1], &data, &len) == napi_ok && data && len >= sizeof(void*)) {
-      memcpy(&handle, data, sizeof(void*));
-    }
-  }
-
+// Build the decode + waylandsink pipeline for a codec. handle is the native window for the
+// mac/Windows overlay, unused on Linux. Returns NULL on parse failure.
+static Player* livi_create_player(const std::string& codec, guintptr handle) {
   // Live low-latency, two queues on purpose:
   //  - BEFORE the decoder: NON-leaky. A stateless HW decoder needs every
   //    encoded frame for its reference chain, dropping one corrupts the DPB
@@ -347,16 +355,23 @@ static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
   //    dropping belongs: if the sink/compositor falls behind, drop DECODED
   //    frames to keep latency low and free the scarce zero-copy capture
   //    buffers, without ever breaking the reference chain
+  const char* decoder = decoder_for(codec);
+
+  std::string presink;
+#if !defined(__APPLE__) && !defined(_WIN32)
+  if (!is_hw_decoder(decoder)) presink = "videoconvert ! ";
+#endif
+
   std::string desc = "appsrc name=src is-live=true do-timestamp=true format=time"
     " min-latency=0 max-latency=0 caps=" +
     caps_for(codec) + " ! " + parser_for(codec) +
     " ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=2000000000" +
-    " ! " + decoder_for(codec) + " name=dec" +
+    " ! " + std::string(decoder) + " name=dec" +
     " ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 leaky=downstream" +
-    " ! " + sink_chain();
+    " ! " + presink + sink_chain();
 
   fprintf(stderr, "[gst_video] codec=%s decoder=%s | %s\n",
-    codec.c_str(), decoder_for(codec), desc.c_str());
+    codec.c_str(), decoder, desc.c_str());
 
   GError* err = nullptr;
   GstElement* pipeline = gst_parse_launch(desc.c_str(), &err);
@@ -365,9 +380,7 @@ static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
       err ? err->message : "unknown");
     if (err) g_error_free(err);
     if (pipeline) gst_object_unref(pipeline);
-    napi_value n;
-    napi_get_null(env, &n);
-    return n;
+    return nullptr;
   }
 
   Player* p = new Player();
@@ -423,6 +436,35 @@ static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
   (void)handle;
 #endif
 
+  return p;
+}
+
+#ifndef LIVI_GST_HOST_STANDALONE
+// createPlayer(codec: string, windowHandle: Buffer) -> external
+static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
+  ensure_init();
+
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+
+  std::string codec = argc >= 1 ? get_string_arg(env, argv[0]) : "h264";
+
+  guintptr handle = 0;
+  if (argc >= 2) {
+    void* data = nullptr;
+    size_t len = 0;
+    if (napi_get_buffer_info(env, argv[1], &data, &len) == napi_ok && data && len >= sizeof(void*)) {
+      memcpy(&handle, data, sizeof(void*));
+    }
+  }
+
+  Player* p = livi_create_player(codec, handle);
+  if (!p) {
+    napi_value n;
+    napi_get_null(env, &n);
+    return n;
+  }
   napi_value ext;
   napi_create_external(env, p, player_finalize, NULL, &ext);
   return ext;
@@ -444,7 +486,15 @@ static napi_value Start(napi_env env, napi_callback_info info) {
   napi_get_undefined(env, &undef);
   return undef;
 }
+#endif
 
+static void livi_push_player(Player* p, const void* data, size_t len) {
+  if (!p || !p->appsrc || !data || len == 0) return;
+  GstBuffer* buf = gst_buffer_new_memdup(data, len);
+  gst_app_src_push_buffer(GST_APP_SRC(p->appsrc), buf);
+}
+
+#ifndef LIVI_GST_HOST_STANDALONE
 // pushBuffer(player, buffer)
 static napi_value PushBuffer(napi_env env, napi_callback_info info) {
   size_t argc = 2;
@@ -452,29 +502,14 @@ static napi_value PushBuffer(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   Player* p = argc >= 1 ? unwrap(env, argv[0]) : nullptr;
 
-  napi_value result;
-  if (!p || !p->appsrc || argc < 2) {
-    napi_get_boolean(env, false, &result);
-    return result;
-  }
-
   void* data = nullptr;
   size_t len = 0;
-  if (napi_get_buffer_info(env, argv[1], &data, &len) != napi_ok || !data || len == 0) {
-    napi_get_boolean(env, false, &result);
-    return result;
-  }
+  bool ok = p && p->appsrc && argc >= 2 &&
+    napi_get_buffer_info(env, argv[1], &data, &len) == napi_ok && data && len > 0;
+  if (ok) livi_push_player(p, data, len);
 
-  // DIAGNOSTIC (inert unless LIVI_DUMP_H265 names a path)
-  static FILE* dump = [] {
-    const char* path = getenv("LIVI_DUMP_H265");
-    return (path && *path) ? fopen(path, "wb") : (FILE*)nullptr;
-  }();
-  if (dump) { fwrite(data, 1, len, dump); fflush(dump); }
-
-  GstBuffer* buf = gst_buffer_new_memdup(data, len);
-  GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(p->appsrc), buf);
-  napi_get_boolean(env, ret == GST_FLOW_OK, &result);
+  napi_value result;
+  napi_get_boolean(env, ok, &result);
   return result;
 }
 
@@ -548,7 +583,146 @@ static napi_value SetBackdrop(napi_env env, napi_callback_info info) {
   napi_get_undefined(env, &undef);
   return undef;
 }
+#endif
 
+#ifdef __linux__
+// gst-host: on Linux x86-64 the pipeline runs in this separate process with a real GLib main loop
+// on the pipeline's own thread, so waylandsink processes resize configures live (Node has no GLib
+// loop). Reads create(1)/data(2)/stop(3) frames from the unix socket the main process serves.
+struct LiviHost {
+  GByteArray* buf;
+  GHashTable* players;  // id -> Player*
+};
+
+static void livi_host_dispatch(LiviHost* h, guint8 op, guint32 id, const guint8* rest, gsize rlen) {
+  gpointer key = GUINT_TO_POINTER(id);
+  if (op == 1) {
+    char codec[16];
+    gsize n = rlen < sizeof(codec) - 1 ? rlen : sizeof(codec) - 1;
+    memcpy(codec, rest, n);
+    codec[n] = '\0';
+    Player* old = (Player*)g_hash_table_lookup(h->players, key);
+    if (old) {
+      g_hash_table_remove(h->players, key);
+      livi_free_player(old);
+    }
+    Player* p = livi_create_player(codec, 0);
+    if (p) {
+      gst_element_set_state(p->pipeline, GST_STATE_PLAYING);
+      g_hash_table_insert(h->players, key, p);
+    }
+  } else if (op == 2) {
+    livi_push_player((Player*)g_hash_table_lookup(h->players, key), rest, rlen);
+  } else if (op == 3) {
+    Player* p = (Player*)g_hash_table_lookup(h->players, key);
+    if (p) {
+      g_hash_table_remove(h->players, key);
+      livi_free_player(p);
+    }
+  }
+}
+
+static gboolean livi_host_readable(gint fd, GIOCondition cond, gpointer data) {
+  LiviHost* h = (LiviHost*)data;
+  if (cond & (G_IO_HUP | G_IO_ERR)) exit(0);
+  guint8 chunk[65536];
+  ssize_t n = read(fd, chunk, sizeof(chunk));
+  if (n <= 0) exit(0);
+  g_byte_array_append(h->buf, chunk, (guint)n);
+  while (h->buf->len >= 4) {
+    guint32 len;
+    memcpy(&len, h->buf->data, 4);
+    if (h->buf->len < 4 + len) break;
+    if (len >= 5) {
+      guint8* payload = h->buf->data + 4;
+      guint32 id;
+      memcpy(&id, payload + 1, 4);
+      livi_host_dispatch(h, payload[0], id, payload + 5, len - 5);
+    }
+    g_byte_array_remove_range(h->buf, 0, 4 + len);
+  }
+  return G_SOURCE_CONTINUE;
+}
+
+// Where to drop the crash backtrace (next to the AppImage); set in Run() before the handler arms.
+static char g_crash_log_path[1024] = {0};
+
+// On a fatal signal, write a resolved backtrace to stderr and to the crash log, then re-raise.
+// Only async-signal-safe calls here (open/write/backtrace_symbols_fd).
+static void livi_host_crash(int sig) {
+  void* frames[64];
+  int n = backtrace(frames, 64);
+  const char hdr[] = "\n=== gst-host CRASH backtrace ===\n";
+  (void)!write(STDERR_FILENO, hdr, sizeof(hdr) - 1);
+  backtrace_symbols_fd(frames, n, STDERR_FILENO);
+  if (g_crash_log_path[0]) {
+    int cf = open(g_crash_log_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (cf >= 0) {
+      (void)!write(cf, hdr, sizeof(hdr) - 1);
+      backtrace_symbols_fd(frames, n, cf);
+      close(cf);
+    }
+  }
+  signal(sig, SIG_DFL);
+  raise(sig);
+}
+
+// Connect to the host socket and run the GLib main loop forever. Shared by the standalone
+// gst-host binary and the napi run() wrapper. The standalone binary is the real fix on x86-64:
+// running outside the Electron executable means system libwayland binds ffi_call to the system
+// libffi it was built against, not Electron's bundled copy (whose ffi_cif ABI differs and
+// corrupts the wayland event marshalling on resize, crashing in g_mutex_lock).
+static void livi_host_main(const char* sockPath, const char* crashLogPath) {
+  ensure_init();
+  if (crashLogPath && crashLogPath[0])
+    strncpy(g_crash_log_path, crashLogPath, sizeof(g_crash_log_path) - 1);
+  signal(SIGSEGV, livi_host_crash);
+  signal(SIGABRT, livi_host_crash);
+
+  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  struct sockaddr_un addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, sockPath, sizeof(addr.sun_path) - 1);
+  if (fd < 0 || connect(fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+    fprintf(stderr, "[gst-host] connect to %s failed\n", sockPath);
+    exit(1);
+  }
+
+  LiviHost* h = new LiviHost();
+  h->buf = g_byte_array_new();
+  h->players = g_hash_table_new(g_direct_hash, g_direct_equal);
+  g_unix_fd_add(fd, (GIOCondition)(G_IO_IN | G_IO_HUP | G_IO_ERR), livi_host_readable, h);
+
+  fprintf(stderr, "[gst-host] ready, running main loop\n");
+  g_main_loop_run(g_main_loop_new(NULL, FALSE));
+}
+
+#ifdef LIVI_GST_HOST_STANDALONE
+// Standalone gst-host: argv[1]=socket path, argv[2]=crash log path.
+int main(int argc, char** argv) {
+  const char* sock = argc > 1 ? argv[1] : "";
+  const char* crash = argc > 2 ? argv[2] : "";
+  livi_host_main(sock, crash);
+  return 0;
+}
+#else
+// run(socketPath, crashLogPath): napi entry, forwards to livi_host_main.
+static napi_value Run(napi_env env, napi_callback_info info) {
+  size_t argc = 2;
+  napi_value argv[2];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  std::string sockPath = argc >= 1 ? get_string_arg(env, argv[0]) : "";
+  std::string crashPath = argc >= 2 ? get_string_arg(env, argv[1]) : "";
+  livi_host_main(sockPath.c_str(), crashPath.c_str());
+  napi_value undef;
+  napi_get_undefined(env, &undef);
+  return undef;
+}
+#endif
+#endif
+
+#ifndef LIVI_GST_HOST_STANDALONE
 static napi_value Init(napi_env env, napi_value exports) {
   napi_value fn;
   napi_create_function(env, "version", NAPI_AUTO_LENGTH, Version, NULL, &fn);
@@ -569,7 +743,12 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_set_named_property(env, exports, "setBackdrop", fn);
   napi_create_function(env, "stop", NAPI_AUTO_LENGTH, Stop, NULL, &fn);
   napi_set_named_property(env, exports, "stop", fn);
+#ifdef __linux__
+  napi_create_function(env, "run", NAPI_AUTO_LENGTH, Run, NULL, &fn);
+  napi_set_named_property(env, exports, "run", fn);
+#endif
   return exports;
 }
 
 NAPI_MODULE(NODE_GYP_MODULE_NAME, Init)
+#endif
