@@ -21,10 +21,8 @@
 #include <unistd.h>
 #endif
 
-// Native window attach is platform-specific: the macOS (Cocoa) implementation lives in
-// gst_video_mac.mm, the Windows (Win32) one in gst_video_win.cc. Both put the video in a
-// native surface under the transparent UI. Linux runs under livi-compositor (waylandsink is
-// its own client placed below the UI), so it uses the bare handle and the no-op stubs.
+// Native window attach: mac in gst_video_mac.mm, Windows in gst_video_win.cc. Linux runs
+// under livi-compositor (waylandsink is its own client), so it uses no-op stubs.
 #if defined(__APPLE__) || defined(_WIN32)
 extern "C" guintptr livi_attach_view(guintptr parent, void** outView);
 extern "C" void livi_remove_view(void* view);
@@ -130,16 +128,66 @@ static GstPadProbeReturn caps_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
   return GST_PAD_PROBE_OK;
 }
 
-// Advertise GstVideoMeta in the decoder's ALLOCATION query. The Pi v4l2codecs
-// decoder zero-copies a frame whose coded buffer layout differs from the
-// display size (1080p is coded at 1088, bottom-cropped) ONLY when downstream
-// advertises GstVideoMeta. Otherwise it sees an offset mismatch and falls
-// back to a system-memory copy ("GstVideoMeta support required, copying frames"
-// in gstv4l2codech265dec.c). waylandsink does not advertise it, so we add it.
-// Combined with the distro plugin's crop fix (need_crop only on x/y offset),
-// this makes 1080p zero-copy. NOTE: only add the meta, never a buffer pool here
-// (a generic pool can't describe DMA_DRM and crashes the decoder with QBUF
-// EINVAL). 720p needs no crop and zero-copies regardless.
+// Colorimetry the dongle welcome screen uses that the Pi 4 stateful v4l2 decoder rejects.
+static const char* kBadColorimetry = "1:4:5:1";
+static const char* kGoodColorimetry = "1:4:7:1";
+
+static const char* caps_colorimetry(GstCaps* caps) {
+  if (!caps || gst_caps_get_size(caps) == 0) return nullptr;
+  return gst_structure_get_string(gst_caps_get_structure(caps, 0), "colorimetry");
+}
+
+// h264parse's getcaps/accept-caps query for kBadColorimetry returns EMPTY from the decoder, so
+// it never pushes caps. Answer it as acceptable so negotiation proceeds; the event probe then
+// rewrites the value the decoder actually sees.
+static GstPadProbeReturn colorimetry_query_probe(GstPad* pad, GstPadProbeInfo* info, gpointer) {
+  GstQuery* q = GST_PAD_PROBE_INFO_QUERY(info);
+  if (!q) return GST_PAD_PROBE_OK;
+  if (GST_QUERY_TYPE(q) == GST_QUERY_CAPS) {
+    GstCaps* filter = nullptr;
+    gst_query_parse_caps(q, &filter);
+    const char* col = caps_colorimetry(filter);
+    if (!col || strcmp(col, kBadColorimetry) != 0) return GST_PAD_PROBE_OK;
+    GstCaps* tmpl = gst_pad_get_pad_template_caps(pad);
+    GstCaps* res = gst_caps_intersect(tmpl, filter);
+    gst_caps_unref(tmpl);
+    gst_query_set_caps_result(q, res);
+    gst_caps_unref(res);
+    return GST_PAD_PROBE_HANDLED;
+  }
+  if (GST_QUERY_TYPE(q) == GST_QUERY_ACCEPT_CAPS) {
+    GstCaps* caps = nullptr;
+    gst_query_parse_accept_caps(q, &caps);
+    const char* col = caps_colorimetry(caps);
+    if (!col || strcmp(col, kBadColorimetry) != 0) return GST_PAD_PROBE_OK;
+    gst_query_set_accept_caps_result(q, TRUE);
+    return GST_PAD_PROBE_HANDLED;
+  }
+  return GST_PAD_PROBE_OK;
+}
+
+// Rewrite kBadColorimetry to kGoodColorimetry on the caps event the decoder sees. Metadata only.
+static GstPadProbeReturn colorimetry_fixup_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
+  GstEvent* ev = GST_PAD_PROBE_INFO_EVENT(info);
+  if (!ev || GST_EVENT_TYPE(ev) != GST_EVENT_CAPS) return GST_PAD_PROBE_OK;
+  GstCaps* caps = nullptr;
+  gst_event_parse_caps(ev, &caps);
+  const char* col = caps_colorimetry(caps);
+  if (!col || strcmp(col, kBadColorimetry) != 0) return GST_PAD_PROBE_OK;
+  GstCaps* nc = gst_caps_copy(caps);
+  gst_caps_set_simple(nc, "colorimetry", G_TYPE_STRING, kGoodColorimetry, NULL);
+  gst_event_unref(ev);
+  GST_PAD_PROBE_INFO_DATA(info) = gst_event_new_caps(nc);
+  gst_caps_unref(nc);
+  fprintf(stderr, "[gst_video] colorimetry %s -> %s (pi4 v4l2 decoder)\n",
+    kBadColorimetry, kGoodColorimetry);
+  return GST_PAD_PROBE_OK;
+}
+
+// Add GstVideoMeta to the decoder's ALLOCATION query. The Pi v4l2codecs decoder only
+// zero-copies a cropped frame (1080p coded at 1088) when downstream advertises VideoMeta,
+// which waylandsink does not. Never add a buffer pool here, it can't describe DMA_DRM and
+// crashes the decoder. 720p needs no crop and zero-copies regardless.
 static GstPadProbeReturn alloc_meta_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
   GstQuery* query = GST_PAD_PROBE_INFO_QUERY(info);
   if (query && GST_QUERY_TYPE(query) == GST_QUERY_ALLOCATION) {
@@ -255,20 +303,16 @@ static const char* decoder_for(const std::string& c) {
 #endif
 }
 
-// Sink chain per platform. Linux presents the decoded dmabuf to the
-// livi-compositor via waylandsink (zero-copy); the compositor lays it under the
-// Electron UI. mac/Windows render into the window surface directly.
+// Sink chain per platform. Linux presents the decoded dmabuf to livi-compositor via
+// waylandsink. mac/Windows render into the window surface directly.
 static std::string sink_chain() {
 #ifdef __APPLE__
-  // force-aspect-ratio=false: the clip view already enforces the content AR, glimagesink must fill
-  // the render surface instead of padding it with black borders (which cover the window backdrop).
+  // force-aspect-ratio=false: the clip view enforces AR, glimagesink must fill (no black bars).
   return "glimagesink name=sink sync=false qos=false force-aspect-ratio=false";
 #elif defined(_WIN32)
   return "d3d11videosink name=sink sync=false qos=false force-aspect-ratio=false";
 #else
-  // waylandsink hands the decoded dmabuf (incl. the Pi's SAND-tiled NV12) to
-  // livi-compositor zero-copy; the compositor samples it as a YUV texture and the
-  // GPU does the colour conversion. LIVI_GST_SINK overrides for debugging.
+  // waylandsink hands the decoded dmabuf to livi-compositor zero-copy. LIVI_GST_SINK overrides.
   const char* sink_env = getenv("LIVI_GST_SINK");
   return std::string(sink_env && *sink_env ? sink_env : "waylandsink") +
     " name=sink sync=false";
@@ -301,7 +345,7 @@ static napi_value Version(napi_env env, napi_callback_info info) {
 }
 
 // probeCodecs() -> { h264: {hw, sw}, h265: {...}, vp9, av1 }
-// hw = a hardware decoder exists; sw = a software decoder exists
+// hw = a hardware decoder exists, sw = a software decoder exists
 static napi_value ProbeCodecs(napi_env env, napi_callback_info info) {
   ensure_init();
   napi_value obj;
@@ -348,15 +392,9 @@ static void player_finalize(napi_env env, void* data, void* hint) {
 // Build the decode + waylandsink pipeline for a codec. handle is the native window for the
 // mac/Windows overlay, unused on Linux. Returns NULL on parse failure.
 static Player* livi_create_player(const std::string& codec, guintptr handle) {
-  // Live low-latency, two queues on purpose:
-  //  - BEFORE the decoder: NON-leaky. A stateless HW decoder needs every
-  //    encoded frame for its reference chain, dropping one corrupts the DPB
-  //    and hangs the HW ("Request took too long"). The HW decodes far faster
-  //    than realtime, so this queue stays near-empty and never needs to drop
-  //  - AFTER the decoder: leaky=downstream. THIS is where live "stay current"
-  //    dropping belongs: if the sink/compositor falls behind, drop DECODED
-  //    frames to keep latency low and free the scarce zero-copy capture
-  //    buffers, without ever breaking the reference chain
+  // Two queues on purpose: before the decoder non-leaky (a stateless HW decoder needs every
+  // frame for its reference chain), after the decoder leaky=downstream (drop decoded frames to
+  // stay current if the sink falls behind, without breaking the reference chain).
   const char* decoder = decoder_for(codec);
 
   std::string presink;
@@ -397,18 +435,25 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
     GstPad* sp = gst_element_get_static_pad(dec, "src");
     if (sp) {
       gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, caps_probe, NULL, NULL);
-      // Advertise GstVideoMeta in the decoder's ALLOCATION query so it exports
-      // the cropped (1088->1080) frame as a dmabuf instead of copying. The
-      // decoder queries its PEER pad in decide_allocation, and that peer is the
-      // post-decoder queue (a queue does not forward allocation queries
-      // synchronously), so the probe must sit on the peer pad, not on
-      // waylandsink further downstream.
+      // The alloc-meta probe sits on the decoder's peer pad (the post-decoder queue), because
+      // the decoder queries that peer in decide_allocation and the queue doesn't forward it.
       GstPad* peer = gst_pad_get_peer(sp);
       if (peer) {
         gst_pad_add_probe(peer, GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, alloc_meta_probe, NULL, NULL);
         gst_object_unref(peer);
       }
       gst_object_unref(sp);
+    }
+    GstPad* dsp = gst_element_get_static_pad(dec, "sink");
+    if (dsp) {
+      // Only the Pi 4 stateful v4l2 decoders reject 1:4:5:1, the Pi 5 stateless ones accept it.
+      if (!strcmp(decoder, "v4l2h264dec") || !strcmp(decoder, "v4l2h265dec")) {
+        gst_pad_add_probe(dsp, GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, colorimetry_query_probe, NULL,
+          NULL);
+        gst_pad_add_probe(dsp, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, colorimetry_fixup_probe, NULL,
+          NULL);
+      }
+      gst_object_unref(dsp);
     }
     gst_object_unref(dec);
   }
@@ -426,9 +471,8 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
   gst_bus_set_sync_handler(bus, bus_sync, NULL, NULL);
   gst_object_unref(bus);
 
-  // mac/Windows embed the sink into the window surface (NSView/HWND). Linux runs
-  // under livi-compositor, where waylandsink is its own client and gets its own
-  // toplevel that the compositor lays under the UI; no handle embedding there.
+  // mac/Windows embed the sink into the window surface. Linux uses waylandsink as its own
+  // compositor client, no handle embedding.
 #ifndef __linux__
   guintptr overlay = handle ? livi_attach_view(handle, &p->view) : handle;
   if (p->sink && GST_IS_VIDEO_OVERLAY(p->sink) && overlay) {
@@ -559,9 +603,8 @@ static napi_value SetContentRegion(napi_env env, napi_callback_info info) {
   return undef;
 }
 
-// setBackdrop(windowHandle: Buffer, r, g, b)  -- r/g/b in 0..1. Paints the window's content
-// view (under the video subviews) so the theme colour shows where the UI is transparent and no
-// video covers, instead of the desktop.
+// setBackdrop(windowHandle, r, g, b): paint the window content view so the theme colour shows
+// where the UI is transparent and no video covers. r/g/b in 0..1.
 static napi_value SetBackdrop(napi_env env, napi_callback_info info) {
   size_t argc = 4;
   napi_value argv[4];
@@ -588,9 +631,8 @@ static napi_value SetBackdrop(napi_env env, napi_callback_info info) {
 #endif
 
 #ifdef __linux__
-// gst-host: on Linux x86-64 the pipeline runs in this separate process with a real GLib main loop
-// on the pipeline's own thread, so waylandsink processes resize configures live (Node has no GLib
-// loop). Reads create(1)/data(2)/stop(3) frames from the unix socket the main process serves.
+// gst-host: runs the pipeline in this separate process with its own GLib main loop. Reads
+// create(1)/data(2)/stop(3) frames from the unix socket the main process serves.
 struct LiviHost {
   GByteArray* buf;
   GHashTable* players;  // id -> Player*
@@ -669,11 +711,9 @@ static void livi_host_crash(int sig) {
   raise(sig);
 }
 
-// Connect to the host socket and run the GLib main loop forever. Shared by the standalone
-// gst-host binary and the napi run() wrapper. The standalone binary is the real fix on x86-64:
-// running outside the Electron executable means system libwayland binds ffi_call to the system
-// libffi it was built against, not Electron's bundled copy (whose ffi_cif ABI differs and
-// corrupts the wayland event marshalling on resize, crashing in g_mutex_lock).
+// Connect to the host socket and run the GLib main loop. The separate process is the libffi
+// fix: outside Electron, libwayland binds the system libffi, not Electron's ABI-incompatible
+// bundled copy that corrupts wayland marshalling on resize.
 static void livi_host_main(const char* sockPath, const char* crashLogPath) {
   ensure_init();
   if (crashLogPath && crashLogPath[0])
