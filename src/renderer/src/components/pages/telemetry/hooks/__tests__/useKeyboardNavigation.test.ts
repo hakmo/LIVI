@@ -1,9 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { useKeyboardNavigation } from '../useKeyboardNavigation'
 
-const revealDotsMock = jest.fn()
+const revealDotsMock = vi.fn()
 
-jest.mock('@renderer/components/pages/telemetry/hooks/usePaginationDots', () => ({
+vi.mock('@renderer/components/pages/telemetry/hooks/usePaginationDots', () => ({
   usePaginationDots: () => ({
     revealDots: revealDotsMock
   })
@@ -11,11 +11,11 @@ jest.mock('@renderer/components/pages/telemetry/hooks/usePaginationDots', () => 
 
 describe('useKeyboardNavigation', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   test('prev navigates to previous dashboard when possible', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -38,7 +38,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('prev does nothing on first dashboard', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -58,7 +58,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('next navigates to next dashboard when possible', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -81,7 +81,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('next does nothing on last dashboard', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -101,7 +101,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('next does nothing when dashboard list is empty', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -120,7 +120,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('canPrev and canNext reflect current pager state', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result, rerender } = renderHook(
       ({ dashboards, index }) =>
@@ -159,7 +159,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('onNavigate clamps index and reveals dots', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -188,7 +188,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('onNavigate does nothing when there is only one dashboard', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -208,7 +208,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('onPointerDown ignores non-primary pointer', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -239,8 +239,8 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('swipe left navigates to next dashboard', () => {
-    const onSetIndex = jest.fn()
-    const performanceSpy = jest
+    const onSetIndex = vi.fn()
+    const performanceSpy = vi
       .spyOn(performance, 'now')
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200)
@@ -278,8 +278,8 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('swipe right navigates to previous dashboard', () => {
-    const onSetIndex = jest.fn()
-    const performanceSpy = jest
+    const onSetIndex = vi.fn()
+    const performanceSpy = vi
       .spyOn(performance, 'now')
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200)
@@ -317,7 +317,7 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('pointer up ignores non-primary pointer', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -348,8 +348,8 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('pointer up does nothing when there was no pointer down', () => {
-    const onSetIndex = jest.fn()
-    const performanceSpy = jest.spyOn(performance, 'now').mockReturnValue(1200)
+    const onSetIndex = vi.fn()
+    const performanceSpy = vi.spyOn(performance, 'now').mockReturnValue(1200)
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({
@@ -374,8 +374,8 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('pointer up ignores swipe when horizontal movement is too small', () => {
-    const onSetIndex = jest.fn()
-    const performanceSpy = jest
+    const onSetIndex = vi.fn()
+    const performanceSpy = vi
       .spyOn(performance, 'now')
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200)
@@ -411,8 +411,8 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('pointer up ignores swipe when vertical movement dominates', () => {
-    const onSetIndex = jest.fn()
-    const performanceSpy = jest
+    const onSetIndex = vi.fn()
+    const performanceSpy = vi
       .spyOn(performance, 'now')
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1200)
@@ -448,10 +448,10 @@ describe('useKeyboardNavigation', () => {
   })
 
   test('pointer up ignores swipe when gesture is too slow', () => {
-    const onSetIndex = jest.fn()
+    const onSetIndex = vi.fn()
     let now = 1000
 
-    const performanceSpy = jest.spyOn(performance, 'now').mockImplementation(() => now)
+    const performanceSpy = vi.spyOn(performance, 'now').mockImplementation(() => now)
 
     const { result } = renderHook(() =>
       useKeyboardNavigation({

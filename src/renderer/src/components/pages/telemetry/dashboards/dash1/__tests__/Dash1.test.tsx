@@ -1,24 +1,24 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { Dash1 } from '../Dash1'
 
-const useVehicleTelemetryMock = jest.fn()
+const useVehicleTelemetryMock = vi.fn()
 
 let resizeObserverCallback:
   | ((entries: Array<{ contentRect: { width: number; height: number } }>) => void)
   | null = null
 
-const observeMock = jest.fn()
-const disconnectMock = jest.fn()
+const observeMock = vi.fn()
+const disconnectMock = vi.fn()
 
-jest.mock('../../../hooks/useVehicleTelemetry', () => ({
+vi.mock('../../../hooks/useVehicleTelemetry', () => ({
   useVehicleTelemetry: () => useVehicleTelemetryMock()
 }))
 
-jest.mock('../../../components/DashShell', () => ({
+vi.mock('../../../components/DashShell', () => ({
   DashShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
 }))
 
-jest.mock('../../../widgets', () => ({
+vi.mock('../../../widgets', () => ({
   GaugeArc: ({ value }: { value: number }) => <div>Gauge:{value}</div>,
   FuelGauge: ({ level, mode }: { level: number; mode: string }) => (
     <div>
@@ -41,8 +41,8 @@ jest.mock('../../../widgets', () => ({
 }))
 
 describe('Dash1', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     resizeObserverCallback = null
     ;(global as any).ResizeObserver = class {
       constructor(
@@ -67,7 +67,7 @@ describe('Dash1', () => {
     })
   })
 
-  test('renders all dashboard widgets with telemetry values', () => {
+  test('renders all dashboard widgets with telemetry values', async () => {
     render(<Dash1 />)
 
     // left ring is fed speed, right ring is fed rpm
@@ -80,7 +80,7 @@ describe('Dash1', () => {
     expect(screen.getByText('Telltale:none:false')).toBeInTheDocument()
   })
 
-  test('falls back to default values when telemetry fields are missing', () => {
+  test('falls back to default values when telemetry fields are missing', async () => {
     useVehicleTelemetryMock.mockReturnValue({
       telemetry: {}
     })
@@ -93,7 +93,7 @@ describe('Dash1', () => {
     expect(screen.getByText('Soft:GEAR:P')).toBeInTheDocument()
   })
 
-  test('accepts numeric gear value', () => {
+  test('accepts numeric gear value', async () => {
     useVehicleTelemetryMock.mockReturnValue({
       telemetry: {
         gear: 3
@@ -105,7 +105,7 @@ describe('Dash1', () => {
     expect(screen.getByText('Soft:GEAR:3')).toBeInTheDocument()
   })
 
-  test('observes host element with ResizeObserver', () => {
+  test('observes host element with ResizeObserver', async () => {
     render(<Dash1 />)
 
     expect(observeMock).toHaveBeenCalledTimes(1)
@@ -135,7 +135,7 @@ describe('Dash1', () => {
     })
   })
 
-  test('disconnects ResizeObserver on unmount', () => {
+  test('disconnects ResizeObserver on unmount', async () => {
     const { unmount } = render(<Dash1 />)
 
     unmount()

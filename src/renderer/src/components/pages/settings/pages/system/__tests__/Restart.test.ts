@@ -6,8 +6,8 @@ describe('Restart', () => {
   })
 
   test('calls window.app.restartApp and returns null', () => {
-    const catchMock = jest.fn()
-    const restartAppMock = jest.fn(() => ({ catch: catchMock }))
+    const catchMock = vi.fn()
+    const restartAppMock = vi.fn(() => ({ catch: catchMock }))
 
     ;(window as any).app = {
       restartApp: restartAppMock
@@ -21,8 +21,8 @@ describe('Restart', () => {
   })
 
   test('does not fire restartApp again on subsequent renders', () => {
-    const catchMock = jest.fn()
-    const restartAppMock = jest.fn(() => ({ catch: catchMock }))
+    const catchMock = vi.fn()
+    const restartAppMock = vi.fn(() => ({ catch: catchMock }))
 
     ;(window as any).app = {
       restartApp: restartAppMock

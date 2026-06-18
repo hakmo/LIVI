@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 
-jest.mock('../components/secondaryWindow/SecondaryAppShell', () => ({
+vi.mock('../components/secondaryWindow/SecondaryAppShell', () => ({
   SecondaryAppShell: ({ role, emptyLabel }: { role: string; emptyLabel: string }) => (
     <div data-testid="shell" data-role={role}>
       {emptyLabel}

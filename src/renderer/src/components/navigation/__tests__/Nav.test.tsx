@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { ROUTES, UI } from '../../../constants'
 import { Nav } from '../Nav'
 
-const navigateMock = jest.fn()
-const quitMock = jest.fn(() => Promise.resolve())
+const navigateMock = vi.fn()
+const quitMock = vi.fn(() => Promise.resolve())
 
 let mockPathname = '' as string
 let mockIsStreaming = false
@@ -14,8 +14,8 @@ let mockTabs = [
   { label: 'Quit', path: ROUTES.QUIT, icon: <span>q</span> }
 ]
 
-jest.mock('react-router', () => {
-  const actual = jest.requireActual('react-router')
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router')
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -23,24 +23,24 @@ jest.mock('react-router', () => {
   }
 })
 
-jest.mock('../../../hooks/useBlinkingTime', () => ({
-  useBlinkingTime: jest.fn()
+vi.mock('../../../hooks/useBlinkingTime', () => ({
+  useBlinkingTime: vi.fn()
 }))
 
-jest.mock('../../../hooks/useNetworkStatus', () => ({
-  useNetworkStatus: jest.fn()
+vi.mock('../../../hooks/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn()
 }))
 
-jest.mock('../../../store/store', () => ({
+vi.mock('../../../store/store', () => ({
   useStatusStore: (selector: (s: { isStreaming: boolean }) => unknown) =>
     selector({ isStreaming: mockIsStreaming })
 }))
 
-jest.mock('../useTabsConfig', () => ({
+vi.mock('../useTabsConfig', () => ({
   useTabsConfig: () => mockTabs
 }))
 
-jest.mock('@mui/material/styles', () => ({
+vi.mock('@mui/material/styles', () => ({
   useTheme: () => ({
     palette: {
       primary: {
@@ -50,7 +50,7 @@ jest.mock('@mui/material/styles', () => ({
   })
 }))
 
-jest.mock('@mui/material/Tabs', () => ({
+vi.mock('@mui/material/Tabs', () => ({
   __esModule: true,
   default: ({ children, onChange, value, ...props }: any) => (
     <div data-testid="tabs" data-value={value} {...props}>
@@ -71,7 +71,7 @@ jest.mock('@mui/material/Tabs', () => ({
   )
 }))
 
-jest.mock('@mui/material/Tab', () => ({
+vi.mock('@mui/material/Tab', () => ({
   __esModule: true,
   default: ({ icon, ...props }: any) => (
     <button type="button" {...props}>
@@ -83,7 +83,7 @@ jest.mock('@mui/material/Tab', () => ({
 describe('Nav', () => {
   const originalInnerHeight = window.innerHeight
 
-  beforeEach(() => {
+  beforeEach(async () => {
     navigateMock.mockReset()
     quitMock.mockClear()
 
@@ -104,7 +104,7 @@ describe('Nav', () => {
     ;(window as any).projection = { quit: quitMock }
   })
 
-  test('returns null when streaming on home page', () => {
+  test('returns null when streaming on home page', async () => {
     mockIsStreaming = true
     mockPathname = ROUTES.HOME
 
@@ -113,7 +113,7 @@ describe('Nav', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  test('renders tabs when streaming but not on home page', () => {
+  test('renders tabs when streaming but not on home page', async () => {
     mockIsStreaming = true
     mockPathname = ROUTES.MEDIA
 
@@ -122,7 +122,7 @@ describe('Nav', () => {
     expect(screen.getByTestId('tabs')).toBeInTheDocument()
   })
 
-  test('uses first tab as fallback when no active tab matches', () => {
+  test('uses first tab as fallback when no active tab matches', async () => {
     mockPathname = '/unknown'
 
     render(<Nav receivingVideo={false} settings={null as never} />)
@@ -130,7 +130,7 @@ describe('Nav', () => {
     expect(screen.getByTestId('tabs')).toHaveAttribute('data-value', '0')
   })
 
-  test('matches nested path with startsWith for non-home tabs', () => {
+  test('matches nested path with startsWith for non-home tabs', async () => {
     mockPathname = '/media/library'
 
     render(<Nav receivingVideo={false} settings={null as never} />)
@@ -138,7 +138,7 @@ describe('Nav', () => {
     expect(screen.getByTestId('tabs')).toHaveAttribute('data-value', '1')
   })
 
-  test('navigates to selected tab path on tab click', () => {
+  test('navigates to selected tab path on tab click', async () => {
     render(<Nav receivingVideo={false} settings={null as never} />)
 
     fireEvent.click(screen.getByLabelText('Media'))
@@ -146,7 +146,7 @@ describe('Nav', () => {
     expect(navigateMock).toHaveBeenCalledWith(ROUTES.MEDIA)
   })
 
-  test('replaces current route when clicking Settings from nested settings path', () => {
+  test('replaces current route when clicking Settings from nested settings path', async () => {
     mockPathname = '/settings/system'
 
     render(<Nav receivingVideo={false} settings={null as never} />)
@@ -156,7 +156,7 @@ describe('Nav', () => {
     expect(navigateMock).toHaveBeenCalledWith(ROUTES.SETTINGS, { replace: true })
   })
 
-  test('calls projection.quit on Quit tab click', () => {
+  test('calls projection.quit on Quit tab click', async () => {
     render(<Nav receivingVideo={false} settings={null as never} />)
 
     fireEvent.click(screen.getByLabelText('Quit'))
@@ -164,7 +164,7 @@ describe('Nav', () => {
     expect(quitMock).toHaveBeenCalledTimes(1)
   })
 
-  test('navigates via Tabs onChange handler', () => {
+  test('navigates via Tabs onChange handler', async () => {
     render(<Nav receivingVideo={false} settings={null as never} />)
 
     fireEvent.click(screen.getByTestId('tabs-change-1'))
@@ -172,7 +172,7 @@ describe('Nav', () => {
     expect(navigateMock).toHaveBeenCalledWith(ROUTES.MEDIA)
   })
 
-  test('uses replace navigation via Tabs onChange when already inside settings', () => {
+  test('uses replace navigation via Tabs onChange when already inside settings', async () => {
     mockPathname = '/settings/system'
 
     render(<Nav receivingVideo={false} settings={null as never} />)
@@ -182,7 +182,7 @@ describe('Nav', () => {
     expect(navigateMock).toHaveBeenCalledWith(ROUTES.SETTINGS, { replace: true })
   })
 
-  test('calls projection.quit via Tabs onChange for quit route', () => {
+  test('calls projection.quit via Tabs onChange for quit route', async () => {
     render(<Nav receivingVideo={false} settings={null as never} />)
 
     fireEvent.click(screen.getByTestId('tabs-change-3'))
@@ -190,7 +190,7 @@ describe('Nav', () => {
     expect(quitMock).toHaveBeenCalledTimes(1)
   })
 
-  test('renders with xs icon sizing branch when viewport height is small', () => {
+  test('renders with xs icon sizing branch when viewport height is small', async () => {
     Object.defineProperty(window, 'innerHeight', {
       configurable: true,
       writable: true,

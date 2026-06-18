@@ -4,7 +4,7 @@ import { DashPlaceholder } from '../DashPlaceholder'
 describe('DashPlaceholder', () => {
   afterEach(() => {
     document.getElementById('content-root')?.remove()
-    jest.restoreAllMocks()
+    vi.restoreAllMocks()
   })
 
   test('renders title even when content-root is missing', () => {
@@ -20,14 +20,14 @@ describe('DashPlaceholder', () => {
     document.body.appendChild(el)
 
     let observerCallback: MutationCallback | undefined
-    const disconnect = jest.fn()
+    const disconnect = vi.fn()
 
     ;(global as any).MutationObserver = class {
       constructor(cb: MutationCallback) {
         observerCallback = cb
       }
 
-      observe = jest.fn()
+      observe = vi.fn()
       disconnect = disconnect
     }
 
@@ -48,12 +48,12 @@ describe('DashPlaceholder', () => {
     el.setAttribute('data-nav-hidden', '1')
     document.body.appendChild(el)
 
-    const disconnect = jest.fn()
+    const disconnect = vi.fn()
 
     ;(global as any).MutationObserver = class {
       constructor(_: MutationCallback) {}
 
-      observe = jest.fn()
+      observe = vi.fn()
       disconnect = disconnect
     }
 

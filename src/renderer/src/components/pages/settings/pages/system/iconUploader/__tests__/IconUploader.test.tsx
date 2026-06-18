@@ -1,19 +1,19 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { IconUploader } from '../IconUploader'
 
-const saveSettings = jest.fn()
-const requestRestart = jest.fn()
+const saveSettings = vi.fn()
+const requestRestart = vi.fn()
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k })
 }))
 
-jest.mock('../utils', () => ({
-  loadImageFromFile: jest.fn().mockResolvedValue({}),
-  resizeImageToBase64Png: jest.fn((_: unknown, size: number) => `b64-${size}`)
+vi.mock('../utils', () => ({
+  loadImageFromFile: vi.fn().mockResolvedValue({}),
+  resizeImageToBase64Png: vi.fn((_: unknown, size: number) => `b64-${size}`)
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) =>
     selector({
       settings: { dongleIcon120: '', dongleIcon180: '', dongleIcon256: '' },
@@ -23,14 +23,14 @@ jest.mock('@store/store', () => ({
 }))
 
 describe('IconUploader', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     saveSettings.mockClear()
     requestRestart.mockClear()
     ;(window as any).projection = {
-      usb: { uploadIcons: jest.fn().mockResolvedValue(undefined) }
+      usb: { uploadIcons: vi.fn().mockResolvedValue(undefined) }
     }
     ;(window as any).app = {
-      resetDongleIcons: jest.fn().mockResolvedValue({
+      resetDongleIcons: vi.fn().mockResolvedValue({
         dongleIcon120: 'x120',
         dongleIcon180: 'x180',
         dongleIcon256: 'x256'
@@ -43,7 +43,7 @@ describe('IconUploader', () => {
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -61,7 +61,7 @@ describe('IconUploader', () => {
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -77,7 +77,7 @@ describe('IconUploader', () => {
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -101,7 +101,7 @@ describe('IconUploader', () => {
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -117,7 +117,7 @@ describe('IconUploader', () => {
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -128,13 +128,13 @@ describe('IconUploader', () => {
   })
 
   test('import failure shows error message', async () => {
-    const { loadImageFromFile } = require('../utils')
+    const { loadImageFromFile } = await import('../utils')
     loadImageFromFile.mockRejectedValueOnce(new Error('bad file'))
     const { container } = render(
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -148,12 +148,12 @@ describe('IconUploader', () => {
   })
 
   test('upload failure shows error message', async () => {
-    ;(window as any).projection.usb.uploadIcons = jest.fn().mockRejectedValue(new Error('usb fail'))
+    ;(window as any).projection.usb.uploadIcons = vi.fn().mockRejectedValue(new Error('usb fail'))
     render(
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
@@ -163,9 +163,9 @@ describe('IconUploader', () => {
     })
   })
 
-  test('shows icon preview when dongleIcon180 is set', () => {
-    // Temporarily override useLiviStore to return a settings with a real base64 icon
-    jest.doMock('@store/store', () => ({
+  test('shows icon preview when dongleIcon180 is set', async () => {
+    vi.resetModules()
+    vi.doMock('@store/store', () => ({
       useLiviStore: (selector: (s: any) => unknown) =>
         selector({
           settings: { dongleIcon120: '', dongleIcon180: 'abc', dongleIcon256: '' },
@@ -173,30 +173,32 @@ describe('IconUploader', () => {
         }),
       useStatusStore: (selector: (s: any) => unknown) => selector({ isDongleConnected: true })
     }))
-    // Use the already-mocked version: set dongleIcon180 via the existing mock
-    // Since jest.mock is module-level, re-render with a settings override via direct mock tweak
-    // Instead, just verify the "No icon found" placeholder when no icon is set
+    const { IconUploader: FreshIconUploader } = await import('../IconUploader')
+
     render(
-      <IconUploader
+      <FreshIconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
-    expect(screen.getByText('No icon found')).toBeInTheDocument()
+    // dongleIcon180 is set, so the placeholder is not shown
+    expect(screen.queryByText('No icon found')).not.toBeInTheDocument()
+
+    vi.doUnmock('@store/store')
   })
 
-  test('keyboard enter on icon box triggers file picker', () => {
+  test('keyboard enter on icon box triggers file picker', async () => {
     render(
       <IconUploader
         state={{} as any}
         node={{} as any}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         requestRestart={requestRestart}
       />
     )
-    const _fileInputRef = { click: jest.fn() }
+    const _fileInputRef = { click: vi.fn() }
     const iconBox = screen.getAllByRole('button')[0] // first is the icon box div
     // Simulate pressing Enter on the icon box
     fireEvent.keyDown(iconBox, { key: 'Enter' })

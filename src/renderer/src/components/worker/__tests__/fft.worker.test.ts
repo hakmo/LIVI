@@ -1,21 +1,23 @@
-const createComplexArrayMock = jest.fn()
-const realTransformMock = jest.fn()
-const completeSpectrumMock = jest.fn()
+const createComplexArrayMock = vi.fn()
+const realTransformMock = vi.fn()
+const completeSpectrumMock = vi.fn()
 
-jest.mock('fft.js', () => {
-  return jest.fn().mockImplementation(() => ({
-    createComplexArray: createComplexArrayMock,
-    realTransform: realTransformMock,
-    completeSpectrum: completeSpectrumMock
-  }))
-})
+vi.mock('fft.js', () => ({
+  default: vi.fn(function () {
+    return {
+      createComplexArray: createComplexArrayMock,
+      realTransform: realTransformMock,
+      completeSpectrum: completeSpectrumMock
+    }
+  })
+}))
 
 describe('fft.worker', () => {
   let postedMessages: Array<{ message: any; transfer?: unknown }>
   let workerHandler: ((e: MessageEvent) => void) | undefined
 
-  beforeEach(() => {
-    jest.resetModules()
+  beforeEach(async () => {
+    vi.resetModules()
     postedMessages = []
 
     createComplexArrayMock.mockReset()
@@ -24,21 +26,21 @@ describe('fft.worker', () => {
 
     createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
     ;(global as any).self = {
-      postMessage: jest.fn((message: any, transfer?: unknown) => {
+      postMessage: vi.fn((message: any, transfer?: unknown) => {
         postedMessages.push({ message, transfer })
       }),
       onmessage: undefined
     }
 
-    require('../fft.worker')
+    await import('../fft.worker')
     workerHandler = (global as any).self.onmessage
   })
 
-  test('registers worker message handler', () => {
+  test('registers worker message handler', async () => {
     expect(typeof workerHandler).toBe('function')
   })
 
-  test('initializes fft worker state on init message', () => {
+  test('initializes fft worker state on init message', async () => {
     workerHandler?.({
       data: {
         type: 'init',
@@ -48,12 +50,12 @@ describe('fft.worker', () => {
       }
     } as MessageEvent)
 
-    const FFT = require('fft.js')
+    const { default: FFT } = await import('fft.js')
     expect(FFT).toHaveBeenCalledWith(8)
     expect(createComplexArrayMock).toHaveBeenCalledTimes(1)
   })
 
-  test('does nothing for pcm before init', () => {
+  test('does nothing for pcm before init', async () => {
     workerHandler?.({
       data: {
         type: 'pcm',
@@ -65,7 +67,7 @@ describe('fft.worker', () => {
     expect(realTransformMock).not.toHaveBeenCalled()
   })
 
-  test('does not emit bins when pcm buffer is shorter than fftSize', () => {
+  test('does not emit bins when pcm buffer is shorter than fftSize', async () => {
     workerHandler?.({
       data: {
         type: 'init',
@@ -86,7 +88,7 @@ describe('fft.worker', () => {
     expect(realTransformMock).not.toHaveBeenCalled()
   })
 
-  test('processes one fft segment and posts normalized bins', () => {
+  test('processes one fft segment and posts normalized bins', async () => {
     createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
 
     realTransformMock.mockImplementation((output: number[]) => {
@@ -132,7 +134,7 @@ describe('fft.worker', () => {
     }
   })
 
-  test('processes multiple fft segments from one pcm message', () => {
+  test('processes multiple fft segments from one pcm message', async () => {
     createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
     realTransformMock.mockImplementation((output: number[]) => {
       for (let i = 0; i < output.length; i++) output[i] = 0
@@ -160,7 +162,7 @@ describe('fft.worker', () => {
     expect(postedMessages).toHaveLength(2)
   })
 
-  test('keeps leftover samples in ring buffer across pcm messages', () => {
+  test('keeps leftover samples in ring buffer across pcm messages', async () => {
     createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
     realTransformMock.mockImplementation((output: number[]) => {
       for (let i = 0; i < output.length; i++) output[i] = 0
@@ -197,7 +199,7 @@ describe('fft.worker', () => {
     expect(postedMessages).toHaveLength(1)
   })
 
-  test('ignores unsupported message types', () => {
+  test('ignores unsupported message types', async () => {
     workerHandler?.({
       data: {
         type: 'unknown'

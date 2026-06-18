@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { SettingsPage } from '../SettingsPage'
 
-const navigateMock = jest.fn()
+const navigateMock = vi.fn()
 let mockNode: any = null
-const handleFieldChange = jest.fn()
-const restartMock = jest.fn()
-const applyBtList = jest.fn()
+const handleFieldChange = vi.fn()
+const restartMock = vi.fn()
+const applyBtList = vi.fn()
 
 const statusState = { isDongleConnected: true, isAaActive: false }
 const liviState = {
@@ -18,33 +18,33 @@ const smartState = {
   handleFieldChange,
   needsRestart: false as boolean,
   restart: restartMock,
-  requestRestart: jest.fn()
+  requestRestart: vi.fn()
 }
 
-jest.mock('react-router', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
   useParams: () => ({ '*': 'audio' })
 }))
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, fb?: string) => fb ?? k })
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useStatusStore: (selector: (s: any) => unknown) => selector(statusState),
   useLiviStore: (selector: (s: any) => unknown) => selector(liviState)
 }))
 
-jest.mock('../hooks/useSmartSettingsFromSchema', () => ({
+vi.mock('../hooks/useSmartSettingsFromSchema', () => ({
   useSmartSettingsFromSchema: () => smartState
 }))
 
-jest.mock('../utils', () => ({
+vi.mock('../utils', () => ({
   getNodeByPath: () => mockNode,
   getValueByPath: (_s: any, _p: string) => false
 }))
 
-jest.mock('../components', () => ({
+vi.mock('../components', () => ({
   StackItem: ({ children, onClick }: any) => (
     <button data-testid="stack-item" onClick={onClick}>
       {children}
@@ -53,13 +53,13 @@ jest.mock('../components', () => ({
   KeyBindingRow: () => <div data-testid="keybinding-row" />
 }))
 
-jest.mock('../components/SettingsFieldPage', () => ({
+vi.mock('../components/SettingsFieldPage', () => ({
   SettingsFieldPage: ({ onChange }: { onChange: (v: unknown) => void }) => (
     <button data-testid="field-page" onClick={() => onChange('next-page-value')} />
   )
 }))
 
-jest.mock('../components/SettingsFieldRow', () => ({
+vi.mock('../components/SettingsFieldRow', () => ({
   SettingsFieldRow: ({
     onChange,
     onClick,
@@ -77,7 +77,7 @@ jest.mock('../components/SettingsFieldRow', () => ({
   )
 }))
 
-jest.mock('../../../layouts', () => ({
+vi.mock('../../../layouts', () => ({
   SettingsLayout: ({ title, children, onRestart }: any) => (
     <div>
       <h1>{title}</h1>

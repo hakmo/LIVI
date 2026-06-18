@@ -3,7 +3,7 @@ import type { Config } from '@shared/types'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { StackItem } from '../StackItem'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => `t:${key}:${fallback ?? ''}`
   })
@@ -45,7 +45,7 @@ describe('StackItem', () => {
   })
 
   test('invokes onClick on Enter and Space keys', () => {
-    const onClick = jest.fn()
+    const onClick = vi.fn()
     render(
       <StackItem onClick={onClick}>
         <span>Open</span>
@@ -96,7 +96,7 @@ describe('StackItem', () => {
   })
 
   test('does not invoke onClick for other keys', () => {
-    const onClick = jest.fn()
+    const onClick = vi.fn()
 
     render(
       <StackItem onClick={onClick}>

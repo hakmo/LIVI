@@ -97,7 +97,7 @@ describe('useFocus', () => {
       navEl: { current: navRoot },
       contentEl: { current: contentRoot },
       keyboardNavigation: { focusedElId: null },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const { result } = renderHook(() => useFocus(), {
@@ -128,7 +128,7 @@ describe('useFocus', () => {
       isTouchDevice: false,
       contentEl: { current: contentRoot },
       keyboardNavigation: { focusedElId: null },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const { result } = renderHook(() => useFocus(), {
@@ -144,7 +144,7 @@ describe('useFocus', () => {
   })
 
   test('moves focus linearly and resets keyboard focused id', () => {
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
     const contentRoot = document.createElement('div')
     contentRoot.id = 'content-root'
 
@@ -240,7 +240,7 @@ describe('useFocus', () => {
         isTouchDevice: false,
         contentEl: { current: contentRoot } as any,
         keyboardNavigation: { focusedElId: null },
-        onSetAppContext: jest.fn()
+        onSetAppContext: vi.fn()
       })
     })
 
@@ -253,8 +253,8 @@ describe('useFocus', () => {
 
     const first = document.createElement('button')
     const second = document.createElement('button')
-    first.scrollIntoView = jest.fn()
-    second.scrollIntoView = jest.fn()
+    first.scrollIntoView = vi.fn()
+    second.scrollIntoView = vi.fn()
 
     contentRoot.appendChild(first)
     contentRoot.appendChild(second)
@@ -269,7 +269,7 @@ describe('useFocus', () => {
         isTouchDevice: false,
         contentEl: { current: contentRoot } as any,
         keyboardNavigation: { focusedElId: 'x' },
-        onSetAppContext: jest.fn()
+        onSetAppContext: vi.fn()
       })
     })
 
@@ -287,7 +287,7 @@ describe('useFocus', () => {
     contentRoot.appendChild(second)
     document.body.appendChild(contentRoot)
 
-    const scrollIntoViewSpy = jest.fn()
+    const scrollIntoViewSpy = vi.fn()
     second.scrollIntoView = scrollIntoViewSpy
 
     const { result } = renderHook(() => useFocus(), {
@@ -295,7 +295,7 @@ describe('useFocus', () => {
         isTouchDevice: false,
         contentEl: { current: contentRoot } as any,
         keyboardNavigation: { focusedElId: null },
-        onSetAppContext: jest.fn()
+        onSetAppContext: vi.fn()
       })
     })
 
@@ -307,7 +307,7 @@ describe('useFocus', () => {
   })
 
   test('moveFocusLinear resets scrolled wrapper to top when next element is outside it', () => {
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
     const contentRoot = document.createElement('div')
     contentRoot.id = 'content-root'
 
@@ -353,7 +353,7 @@ describe('useFocus', () => {
         isTouchDevice: false,
         contentEl: { current: contentRoot } as any,
         keyboardNavigation: { focusedElId: null },
-        onSetAppContext: jest.fn()
+        onSetAppContext: vi.fn()
       })
     })
 
@@ -364,7 +364,7 @@ describe('useFocus', () => {
   })
 
   test('moveFocusLinear scrolls scrolled wrapper up when next element is above viewport', () => {
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
     const contentRoot = document.createElement('div')
     contentRoot.id = 'content-root'
 

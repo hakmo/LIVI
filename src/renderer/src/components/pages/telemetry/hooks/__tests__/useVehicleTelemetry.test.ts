@@ -3,33 +3,33 @@ import { useVehicleTelemetry } from '../useVehicleTelemetry'
 
 describe('useVehicleTelemetry', () => {
   let onTelemetryCb: ((payload: unknown) => void) | undefined
-  const onTelemetryMock = jest.fn()
-  const offTelemetryMock = jest.fn()
+  const onTelemetryMock = vi.fn()
+  const offTelemetryMock = vi.fn()
 
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     onTelemetryCb = undefined
     ;(window as any).projection = {
       ipc: {
-        onTelemetry: jest.fn((cb: (payload: unknown) => void) => {
+        onTelemetry: vi.fn((cb: (payload: unknown) => void) => {
           onTelemetryCb = cb
           onTelemetryMock(cb)
         }),
-        offTelemetry: jest.fn((cb: (payload: unknown) => void) => {
+        offTelemetry: vi.fn((cb: (payload: unknown) => void) => {
           offTelemetryMock(cb)
         })
       }
     }
   })
 
-  test('subscribes to telemetry on mount', () => {
+  test('subscribes to telemetry on mount', async () => {
     renderHook(() => useVehicleTelemetry())
 
     expect((window as any).projection.ipc.onTelemetry).toHaveBeenCalledTimes(1)
     expect(onTelemetryCb).toBeDefined()
   })
 
-  test('unsubscribes from telemetry on unmount', () => {
+  test('unsubscribes from telemetry on unmount', async () => {
     const { unmount } = renderHook(() => useVehicleTelemetry())
 
     const cb = onTelemetryCb
@@ -39,14 +39,14 @@ describe('useVehicleTelemetry', () => {
     expect((window as any).projection.ipc.offTelemetry).toHaveBeenCalledWith(cb)
   })
 
-  test('starts with null telemetry and stale state', () => {
+  test('starts with null telemetry and stale state', async () => {
     const { result } = renderHook(() => useVehicleTelemetry())
 
     expect(result.current.telemetry).toBeNull()
     expect(result.current.isStale).toBe(true)
   })
 
-  test('ignores non-object telemetry payloads', () => {
+  test('ignores non-object telemetry payloads', async () => {
     const { result } = renderHook(() => useVehicleTelemetry())
 
     act(() => {
@@ -82,7 +82,7 @@ describe('useVehicleTelemetry', () => {
   })
 
   test('fills missing timestamp with Date.now', async () => {
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(123456789)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(123456789)
 
     const { result } = renderHook(() => useVehicleTelemetry())
 
@@ -137,7 +137,7 @@ describe('useVehicleTelemetry', () => {
   })
 
   test('reports stale when telemetry timestamp is older than 1500ms', async () => {
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000)
 
     const { result } = renderHook(() => useVehicleTelemetry())
 
@@ -161,7 +161,7 @@ describe('useVehicleTelemetry', () => {
   })
 
   test('reports not stale when telemetry timestamp is recent', async () => {
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5000)
 
     const { result } = renderHook(() => useVehicleTelemetry())
 

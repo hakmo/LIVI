@@ -3,12 +3,12 @@ import { flash } from '../../utils/flash'
 
 describe('flash', () => {
   beforeEach(() => {
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
   })
 
   afterEach(() => {
-    jest.runOnlyPendingTimers()
-    jest.useRealTimers()
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
   test('does nothing when ref has no current element', () => {
@@ -33,7 +33,7 @@ describe('flash', () => {
     expect(button.style.transform).toBe('scale(0.94)')
     expect(button.style.boxShadow).toBe('0 0 0 5px rgba(255,255,255,0.35) inset')
 
-    jest.advanceTimersByTime(FLASH_TIMEOUT_MS)
+    vi.advanceTimersByTime(FLASH_TIMEOUT_MS)
 
     expect(button.style.transform).toBe('scale(1)')
     expect(button.style.boxShadow).toBe('none')
@@ -53,12 +53,12 @@ describe('flash', () => {
     expect(button.style.transform).toBe('scale(0.94)')
     expect(button.style.boxShadow).toBe('0 0 0 5px rgba(255,255,255,0.35) inset')
 
-    jest.advanceTimersByTime(122)
+    vi.advanceTimersByTime(122)
 
     expect(button.style.transform).toBe('scale(0.94)')
     expect(button.style.boxShadow).toBe('0 0 0 5px rgba(255,255,255,0.35) inset')
 
-    jest.advanceTimersByTime(1)
+    vi.advanceTimersByTime(1)
 
     expect(button.style.transform).toBe('translateX(2px)')
     expect(button.style.boxShadow).toBe('rgb(1, 2, 3) 0px 0px 1px inset')

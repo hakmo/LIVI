@@ -6,8 +6,8 @@ describe('PowerOff', () => {
   })
 
   test('calls window.app.quitApp and returns null', () => {
-    const catchMock = jest.fn()
-    const quitAppMock = jest.fn(() => ({ catch: catchMock }))
+    const catchMock = vi.fn()
+    const quitAppMock = vi.fn(() => ({ catch: catchMock }))
 
     ;(window as any).app = {
       quitApp: quitAppMock
@@ -21,8 +21,8 @@ describe('PowerOff', () => {
   })
 
   test('does not fire quitApp again on subsequent renders', () => {
-    const catchMock = jest.fn()
-    const quitAppMock = jest.fn(() => ({ catch: catchMock }))
+    const catchMock = vi.fn()
+    const quitAppMock = vi.fn(() => ({ catch: catchMock }))
 
     ;(window as any).app = {
       quitApp: quitAppMock

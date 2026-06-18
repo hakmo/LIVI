@@ -1,12 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { SettingsFieldControl } from '../SettingsFieldControl'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => `t:${k}` })
 }))
 
-jest.mock('@mui/material', () => {
-  const actual = jest.requireActual('@mui/material')
+vi.mock('@mui/material', async () => {
+  const actual = await vi.importActual('@mui/material')
   return {
     ...actual,
     TextField: ({ value, onChange, type = 'text' }: any) => (
@@ -46,7 +46,7 @@ jest.mock('@mui/material', () => {
   }
 })
 
-jest.mock('../numberSpinner/numberSpinner', () => ({
+vi.mock('../numberSpinner/numberSpinner', () => ({
   __esModule: true,
   default: ({ onValueChange }: { onValueChange: (n: number) => void }) => (
     <div>
@@ -57,8 +57,8 @@ jest.mock('../numberSpinner/numberSpinner', () => ({
 }))
 
 describe('SettingsFieldControl', () => {
-  test('string node forwards text changes', () => {
-    const onChange = jest.fn()
+  test('string node forwards text changes', async () => {
+    const onChange = vi.fn()
     render(
       <SettingsFieldControl
         node={{ type: 'string', label: 'Name', path: 'name' } as any}
@@ -70,8 +70,8 @@ describe('SettingsFieldControl', () => {
     expect(onChange).toHaveBeenCalledWith('new')
   })
 
-  test('number node clamps and ignores non-finite values', () => {
-    const onChange = jest.fn()
+  test('number node clamps and ignores non-finite values', async () => {
+    const onChange = vi.fn()
     render(
       <SettingsFieldControl
         node={{ type: 'number', label: 'FPS', path: 'fps', min: 10, max: 30 } as any}
@@ -85,8 +85,8 @@ describe('SettingsFieldControl', () => {
     expect(onChange).toHaveBeenCalledWith(30)
   })
 
-  test('checkbox node forwards boolean changes', () => {
-    const onChange = jest.fn()
+  test('checkbox node forwards boolean changes', async () => {
+    const onChange = vi.fn()
     render(
       <SettingsFieldControl
         node={{ type: 'checkbox', label: 'Mute', path: 'mute' } as any}
@@ -98,8 +98,8 @@ describe('SettingsFieldControl', () => {
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
-  test('slider node converts 0..100 to fraction', () => {
-    const onChange = jest.fn()
+  test('slider node converts 0..100 to fraction', async () => {
+    const onChange = vi.fn()
     render(
       <SettingsFieldControl
         node={{ type: 'slider', label: 'Scale', path: 'scale' } as any}
@@ -111,8 +111,8 @@ describe('SettingsFieldControl', () => {
     expect(onChange).toHaveBeenCalledWith(0.4)
   })
 
-  test('select node uses translated label and forwards selected value', () => {
-    const onChange = jest.fn()
+  test('select node uses translated label and forwards selected value', async () => {
+    const onChange = vi.fn()
     render(
       <SettingsFieldControl
         node={
@@ -132,8 +132,8 @@ describe('SettingsFieldControl', () => {
     expect(onChange).toHaveBeenCalledWith('auto')
   })
 
-  test('color node uses default color and supports reset', () => {
-    const onChange = jest.fn()
+  test('color node uses default color and supports reset', async () => {
+    const onChange = vi.fn()
     const { rerender } = render(
       <SettingsFieldControl
         node={{ type: 'color', label: 'Highlight', path: 'highlightColorDark' } as any}

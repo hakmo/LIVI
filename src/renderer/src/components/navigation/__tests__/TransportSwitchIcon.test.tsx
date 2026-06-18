@@ -1,24 +1,24 @@
 import { render, screen } from '@testing-library/react'
 import { TransportSwitchIcon } from '../TransportSwitchIcon'
 
-jest.mock('@mui/icons-material/Sync', () => ({
+vi.mock('@mui/icons-material/Sync', () => ({
   __esModule: true,
   default: (props: { sx?: { fontSize?: string | number } }) => (
     <svg data-testid="sync-icon" data-fontsize={String(props.sx?.fontSize ?? '')} />
   )
 }))
 
-jest.mock('@mui/icons-material/CableOutlined', () => ({
+vi.mock('@mui/icons-material/CableOutlined', () => ({
   __esModule: true,
   default: () => <svg data-testid="cable-icon" />
 }))
 
-jest.mock('@mui/icons-material/WifiOutlined', () => ({
+vi.mock('@mui/icons-material/WifiOutlined', () => ({
   __esModule: true,
   default: () => <svg data-testid="wifi-icon" />
 }))
 
-jest.mock('@mui/icons-material/DeviceHub', () => ({
+vi.mock('@mui/icons-material/DeviceHub', () => ({
   __esModule: true,
   default: () => <svg data-testid="dongle-icon" />
 }))

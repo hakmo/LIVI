@@ -1,4 +1,5 @@
 import type { Config } from '@shared/types'
+import type { Mock } from 'vitest'
 import { updateCameras } from '../cameraDetection'
 
 describe('updateCameras', () => {
@@ -22,16 +23,16 @@ describe('updateCameras', () => {
       toJSON: () => ({})
     }) as MediaDeviceInfo
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
-        enumerateDevices: jest.fn()
+        enumerateDevices: vi.fn()
       }
     })
   })
 
-  afterAll(() => {
+  afterAll(async () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: originalMediaDevices
@@ -39,10 +40,10 @@ describe('updateCameras', () => {
   })
 
   test('returns only video input devices and sets camera found true', async () => {
-    const setCameraFound = jest.fn()
-    const saveSettings = jest.fn()
+    const setCameraFound = vi.fn()
+    const saveSettings = vi.fn()
 
-    ;(navigator.mediaDevices.enumerateDevices as jest.Mock).mockResolvedValue([
+    ;(navigator.mediaDevices.enumerateDevices as Mock).mockResolvedValue([
       makeAudioInput('mic-1'),
       makeVideoInput('cam-1', 'Camera 1'),
       makeVideoInput('cam-2', 'Camera 2')
@@ -67,10 +68,10 @@ describe('updateCameras', () => {
   })
 
   test('saves first detected camera when no current camera is set', async () => {
-    const setCameraFound = jest.fn()
-    const saveSettings = jest.fn()
+    const setCameraFound = vi.fn()
+    const saveSettings = vi.fn()
 
-    ;(navigator.mediaDevices.enumerateDevices as jest.Mock).mockResolvedValue([
+    ;(navigator.mediaDevices.enumerateDevices as Mock).mockResolvedValue([
       makeVideoInput('cam-1'),
       makeVideoInput('cam-2')
     ])
@@ -88,12 +89,10 @@ describe('updateCameras', () => {
   })
 
   test('does not save settings when camera is already configured', async () => {
-    const setCameraFound = jest.fn()
-    const saveSettings = jest.fn()
+    const setCameraFound = vi.fn()
+    const saveSettings = vi.fn()
 
-    ;(navigator.mediaDevices.enumerateDevices as jest.Mock).mockResolvedValue([
-      makeVideoInput('cam-1')
-    ])
+    ;(navigator.mediaDevices.enumerateDevices as Mock).mockResolvedValue([makeVideoInput('cam-1')])
 
     const currentSettings = {
       cameraId: 'existing-cam'
@@ -105,12 +104,10 @@ describe('updateCameras', () => {
   })
 
   test('sets camera found false and does not save when no cameras exist', async () => {
-    const setCameraFound = jest.fn()
-    const saveSettings = jest.fn()
+    const setCameraFound = vi.fn()
+    const saveSettings = vi.fn()
 
-    ;(navigator.mediaDevices.enumerateDevices as jest.Mock).mockResolvedValue([
-      makeAudioInput('mic-1')
-    ])
+    ;(navigator.mediaDevices.enumerateDevices as Mock).mockResolvedValue([makeAudioInput('mic-1')])
 
     const currentSettings = {} as Config
 
@@ -122,13 +119,13 @@ describe('updateCameras', () => {
   })
 
   test('returns empty array and warns when enumerateDevices fails', async () => {
-    const setCameraFound = jest.fn()
-    const saveSettings = jest.fn()
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const setCameraFound = vi.fn()
+    const saveSettings = vi.fn()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     const error = new Error('enumerate failed')
 
-    ;(navigator.mediaDevices.enumerateDevices as jest.Mock).mockRejectedValue(error)
+    ;(navigator.mediaDevices.enumerateDevices as Mock).mockRejectedValue(error)
 
     const currentSettings = {} as Config
 

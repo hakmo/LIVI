@@ -3,29 +3,29 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { BtDeviceList } from '../BtDeviceList'
 
-const mockUseLiviStore = jest.fn()
-const removeMock = jest.fn()
-const connectMock = jest.fn()
-const saveSettingsMock = jest.fn()
+const mockUseLiviStore = vi.fn()
+const removeMock = vi.fn()
+const connectMock = vi.fn()
+const saveSettingsMock = vi.fn()
 
-jest.mock('@renderer/store/store', () => ({
+vi.mock('@renderer/store/store', () => ({
   useLiviStore: (selector: (state: Record<string, unknown>) => unknown) =>
     mockUseLiviStore(selector)
 }))
 
-jest.mock('../../stackItem', () => ({
+vi.mock('../../stackItem', () => ({
   StackItem: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children)
 }))
 
 describe('BtDeviceList', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
 
     Object.defineProperty(window, 'projection', {
       value: {
         usb: {
-          forceReset: jest.fn().mockResolvedValue(undefined)
+          forceReset: vi.fn().mockResolvedValue(undefined)
         }
       },
       writable: true,
@@ -57,7 +57,7 @@ describe('BtDeviceList', () => {
   test('connect click saves PhoneWorkMode.Android for AndroidAuto devices and resets usb on success', async () => {
     connectMock.mockResolvedValue(true)
     saveSettingsMock.mockResolvedValue(undefined)
-    const forceResetMock = jest.fn().mockResolvedValue(undefined)
+    const forceResetMock = vi.fn().mockResolvedValue(undefined)
     window.projection.usb.forceReset = forceResetMock
 
     renderWithState({
@@ -91,7 +91,7 @@ describe('BtDeviceList', () => {
   test('connect click saves PhoneWorkMode.CarPlay for non-AndroidAuto devices', async () => {
     connectMock.mockResolvedValue(true)
     saveSettingsMock.mockResolvedValue(undefined)
-    window.projection.usb.forceReset = jest.fn().mockResolvedValue(undefined)
+    window.projection.usb.forceReset = vi.fn().mockResolvedValue(undefined)
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'BB:BB:BB:BB:BB:BB', name: 'iPhone' }],
@@ -116,7 +116,7 @@ describe('BtDeviceList', () => {
   test('clears pending state and does not reset usb when connect fails', async () => {
     connectMock.mockResolvedValue(false)
     saveSettingsMock.mockResolvedValue(undefined)
-    const forceResetMock = jest.fn().mockResolvedValue(undefined)
+    const forceResetMock = vi.fn().mockResolvedValue(undefined)
     window.projection.usb.forceReset = forceResetMock
 
     renderWithState({
@@ -141,10 +141,10 @@ describe('BtDeviceList', () => {
   })
 
   test('clears pending state when usb forceReset fails', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     connectMock.mockResolvedValue(true)
     saveSettingsMock.mockResolvedValue(undefined)
-    window.projection.usb.forceReset = jest.fn().mockRejectedValue(new Error('reset failed'))
+    window.projection.usb.forceReset = vi.fn().mockRejectedValue(new Error('reset failed'))
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
@@ -215,7 +215,7 @@ describe('BtDeviceList', () => {
     })
   })
 
-  test('calls remove handler with device mac on click', () => {
+  test('calls remove handler with device mac on click', async () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
       forgetBluetoothPairedDevice: removeMock,
@@ -233,7 +233,7 @@ describe('BtDeviceList', () => {
     expect(removeMock).toHaveBeenCalledWith('AA:AA:AA:AA:AA:AA')
   })
 
-  test('handles missing boxInfo gracefully', () => {
+  test('handles missing boxInfo gracefully', async () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
       forgetBluetoothPairedDevice: removeMock,
@@ -245,7 +245,7 @@ describe('BtDeviceList', () => {
     expect(screen.getByText('Device A')).toBeInTheDocument()
   })
 
-  test('uses cached device metadata when DevList entry is no longer present', () => {
+  test('uses cached device metadata when DevList entry is no longer present', async () => {
     let state = {
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
       forgetBluetoothPairedDevice: removeMock,
@@ -286,7 +286,7 @@ describe('BtDeviceList', () => {
         })
     )
     saveSettingsMock.mockResolvedValue(undefined)
-    window.projection.usb.forceReset = jest.fn().mockResolvedValue(undefined)
+    window.projection.usb.forceReset = vi.fn().mockResolvedValue(undefined)
 
     renderWithState({
       bluetoothPairedDevices: [
@@ -318,7 +318,7 @@ describe('BtDeviceList', () => {
     resolveConnect(true)
   })
 
-  test('renders no buttons when bluetoothPairedDevices is not an array', () => {
+  test('renders no buttons when bluetoothPairedDevices is not an array', async () => {
     renderWithState({
       bluetoothPairedDevices: null,
       forgetBluetoothPairedDevice: removeMock,
@@ -333,7 +333,7 @@ describe('BtDeviceList', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  test('ignores DevList entries with empty ids', () => {
+  test('ignores DevList entries with empty ids', async () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
       forgetBluetoothPairedDevice: removeMock,
@@ -351,7 +351,7 @@ describe('BtDeviceList', () => {
     expect(screen.getByText('Device A')).toBeInTheDocument()
   })
 
-  test('falls back to index 999 when DevList entry has no index', () => {
+  test('falls back to index 999 when DevList entry has no index', async () => {
     renderWithState({
       bluetoothPairedDevices: [
         { mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' },
@@ -374,7 +374,7 @@ describe('BtDeviceList', () => {
     expect(names).toEqual(['Device B', 'Device A'])
   })
 
-  test('lists phones and hides audio devices (CoD Major Class 0x04)', () => {
+  test('lists phones and hides audio devices (CoD Major Class 0x04)', async () => {
     renderWithState({
       bluetoothPairedDevices: [
         { mac: 'AA:AA:AA:AA:AA:AA', name: 'Pixel 8' },
@@ -396,7 +396,7 @@ describe('BtDeviceList', () => {
     expect(screen.queryByText('EPOS ADAPT 660 AMC')).not.toBeInTheDocument()
   })
 
-  test('devices without CoD class are treated as phones (kept in the list)', () => {
+  test('devices without CoD class are treated as phones (kept in the list)', async () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Pixel 8' }],
       forgetBluetoothPairedDevice: removeMock,

@@ -1,29 +1,30 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { Camera } from '../Camera'
 
 let mockSettings: any = null
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: { settings: unknown }) => unknown) =>
     selector({ settings: mockSettings })
 }))
 
 describe('pages/camera Camera', () => {
-  const addEventListener = jest.fn()
-  const removeEventListener = jest.fn()
-  const enumerateDevices = jest.fn()
-  const getUserMedia = jest.fn()
+  const addEventListener = vi.fn()
+  const removeEventListener = vi.fn()
+  const enumerateDevices = vi.fn()
+  const getUserMedia = vi.fn()
 
   const createStream = () => {
-    const track = { stop: jest.fn(), getSettings: jest.fn(() => ({ width: 1280, height: 720 })) }
+    const track = { stop: vi.fn(), getSettings: vi.fn(() => ({ width: 1280, height: 720 })) }
     return {
       getTracks: () => [track],
       getVideoTracks: () => [track]
     } as unknown as MediaStream
   }
 
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     mockSettings = { cameraId: 'cam-1', cameraMirror: false }
 
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -38,12 +39,12 @@ describe('pages/camera Camera', () => {
 
     Object.defineProperty(HTMLMediaElement.prototype, 'play', {
       configurable: true,
-      value: jest.fn(() => Promise.resolve())
+      value: vi.fn(() => Promise.resolve())
     })
 
     Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
       configurable: true,
-      value: jest.fn()
+      value: vi.fn()
     })
   })
 
@@ -127,6 +128,6 @@ describe('pages/camera Camera', () => {
     unmount()
 
     expect(removeEventListener).toHaveBeenCalledWith('devicechange', deviceChangeHandler)
-    expect(HTMLMediaElement.prototype.pause as jest.Mock).toHaveBeenCalled()
+    expect(HTMLMediaElement.prototype.pause as Mock).toHaveBeenCalled()
   })
 })

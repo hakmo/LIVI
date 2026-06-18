@@ -1,11 +1,11 @@
 import type React from 'react'
 
-const createRootMock = jest.fn()
-const renderMock = jest.fn()
-const initCursorHiderMock = jest.fn()
-const initUiBreatheClockMock = jest.fn()
-const buildRuntimeThemeMock = jest.fn()
-const setStateMock = jest.fn()
+const createRootMock = vi.fn()
+const renderMock = vi.fn()
+const initCursorHiderMock = vi.fn()
+const initUiBreatheClockMock = vi.fn()
+const buildRuntimeThemeMock = vi.fn()
+const setStateMock = vi.fn()
 
 let mockedSettings: any = {
   darkMode: true,
@@ -15,18 +15,18 @@ let mockedSettings: any = {
 
 let capturedRootElement: React.ReactElement | null = null
 
-jest.mock('react', () => {
-  const actual = jest.requireActual('react')
+vi.mock('react', async () => {
+  const actual = await vi.importActual('react')
 
   return {
     ...actual,
-    useState: jest.fn((initial: unknown) => [initial, setStateMock]),
-    useCallback: jest.fn((fn: unknown) => fn),
-    useMemo: jest.fn((fn: () => unknown) => fn())
+    useState: vi.fn((initial: unknown) => [initial, setStateMock]),
+    useCallback: vi.fn((fn: unknown) => fn),
+    useMemo: vi.fn((fn: () => unknown) => fn())
   }
 })
 
-jest.mock('react-dom/client', () => {
+vi.mock('react-dom/client', async () => {
   const createRoot = (...args: unknown[]) => {
     createRootMock(...args)
     return {
@@ -34,7 +34,7 @@ jest.mock('react-dom/client', () => {
         renderMock(element)
         capturedRootElement = element
       },
-      unmount: jest.fn()
+      unmount: vi.fn()
     }
   }
 
@@ -45,38 +45,38 @@ jest.mock('react-dom/client', () => {
   }
 })
 
-jest.mock('../App.tsx', () => ({
-  __esModule: true,
-  default: () => {
-    const React = require('react')
-    return React.createElement('div', { 'data-testid': 'app' }, 'app')
+vi.mock('../App.tsx', async () => {
+  const React = await import('react')
+  return {
+    __esModule: true,
+    default: () => React.createElement('div', { 'data-testid': 'app' }, 'app')
   }
-}))
+})
 
-jest.mock('../DashApp.tsx', () => ({
-  __esModule: true,
-  default: () => {
-    const React = require('react')
-    return React.createElement('div', { 'data-testid': 'dash-app' }, 'dash')
+vi.mock('../DashApp.tsx', async () => {
+  const React = await import('react')
+  return {
+    __esModule: true,
+    default: () => React.createElement('div', { 'data-testid': 'dash-app' }, 'dash')
   }
-}))
+})
 
-jest.mock('../AuxApp.tsx', () => ({
-  __esModule: true,
-  default: () => {
-    const React = require('react')
-    return React.createElement('div', { 'data-testid': 'aux-app' }, 'aux')
+vi.mock('../AuxApp.tsx', async () => {
+  const React = await import('react')
+  return {
+    __esModule: true,
+    default: () => React.createElement('div', { 'data-testid': 'aux-app' }, 'aux')
   }
-}))
+})
 
-jest.mock('../store/store', () => ({
+vi.mock('../store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) =>
     selector({
       settings: mockedSettings
     })
 }))
 
-jest.mock('../theme', () => ({
+vi.mock('../theme', () => ({
   darkTheme: { palette: { mode: 'dark', source: 'darkTheme' } },
   lightTheme: { palette: { mode: 'light', source: 'lightTheme' } },
   buildRuntimeTheme: (...args: unknown[]) => buildRuntimeThemeMock(...args),
@@ -84,8 +84,8 @@ jest.mock('../theme', () => ({
   initUiBreatheClock: () => initUiBreatheClockMock()
 }))
 
-jest.mock('../context', () => {
-  const React = require('react')
+vi.mock('../context', async () => {
+  const React = await import('react')
   return {
     AppContext: React.createContext({
       isTouchDevice: false,
@@ -94,15 +94,15 @@ jest.mock('../context', () => {
   }
 })
 
-jest.mock('../constants', () => ({
+vi.mock('../constants', () => ({
   THEME: {
     DARK: 'dark',
     LIGHT: 'light'
   }
 }))
 
-jest.mock('@mui/material', () => {
-  const React = require('react')
+vi.mock('@mui/material', async () => {
+  const React = await import('react')
   return {
     ThemeProvider: ({ theme, children }: any) =>
       React.createElement(
@@ -122,16 +122,16 @@ jest.mock('@mui/material', () => {
   }
 })
 
-jest.mock('@fontsource/roboto/300.css', () => ({}), { virtual: true })
-jest.mock('@fontsource/roboto/400.css', () => ({}), { virtual: true })
-jest.mock('@fontsource/roboto/500.css', () => ({}), { virtual: true })
-jest.mock('@fontsource/roboto/700.css', () => ({}), { virtual: true })
-jest.mock('../i18n', () => ({}))
+vi.mock('@fontsource/roboto/300.css', () => ({}), { virtual: true })
+vi.mock('@fontsource/roboto/400.css', () => ({}), { virtual: true })
+vi.mock('@fontsource/roboto/500.css', () => ({}), { virtual: true })
+vi.mock('@fontsource/roboto/700.css', () => ({}), { virtual: true })
+vi.mock('../i18n', () => ({}))
 
 describe('renderer main bootstrap', () => {
-  beforeEach(() => {
-    jest.resetModules()
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.clearAllMocks()
     capturedRootElement = null
 
     mockedSettings = {
@@ -146,13 +146,13 @@ describe('renderer main bootstrap', () => {
 
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
-      value: jest.fn().mockReturnValue({
+      value: vi.fn().mockReturnValue({
         matches: false,
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn()
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn()
       })
     })
 
@@ -164,17 +164,17 @@ describe('renderer main bootstrap', () => {
     document.body.innerHTML = '<div id="root"></div>'
   })
 
-  function requireMain() {
-    return require('../main') as typeof import('../main')
+  async function requireMain() {
+    return await import('../main')
   }
 
-  function renderRootDirectly() {
-    const mod = requireMain()
+  async function renderRootDirectly() {
+    const mod = await requireMain()
     return mod.Root()
   }
 
-  test('initializes UI timers and mounts react root', () => {
-    requireMain()
+  test('initializes UI timers and mounts react root', async () => {
+    await requireMain()
 
     expect(initUiBreatheClockMock).toHaveBeenCalledTimes(1)
     expect(initCursorHiderMock).toHaveBeenCalledTimes(1)
@@ -183,7 +183,7 @@ describe('renderer main bootstrap', () => {
     expect(capturedRootElement).toBeTruthy()
   })
 
-  test('uses runtime theme when dark mode has color overrides', () => {
+  test('uses runtime theme when dark mode has color overrides', async () => {
     mockedSettings = {
       darkMode: true,
       primaryColorDark: '#111111',
@@ -191,12 +191,12 @@ describe('renderer main bootstrap', () => {
       backgroundColorDark: '#000000'
     }
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(buildRuntimeThemeMock).toHaveBeenCalledWith('dark', '#111111', '#222222', '#000000')
   })
 
-  test('uses light runtime theme when light mode has overrides', () => {
+  test('uses light runtime theme when light mode has overrides', async () => {
     mockedSettings = {
       darkMode: false,
       primaryColorLight: '#aaaaaa',
@@ -208,41 +208,41 @@ describe('renderer main bootstrap', () => {
       palette: { mode: 'light', source: 'runtime' }
     })
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(buildRuntimeThemeMock).toHaveBeenCalledWith('light', '#aaaaaa', '#bbbbbb', '#d4d4d4')
   })
 
-  test('falls back to darkTheme when no overrides exist and darkMode is true', () => {
+  test('falls back to darkTheme when no overrides exist and darkMode is true', async () => {
     mockedSettings = {
       darkMode: true
     }
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(buildRuntimeThemeMock).not.toHaveBeenCalled()
   })
 
-  test('falls back to lightTheme when no overrides exist and darkMode is false', () => {
+  test('falls back to lightTheme when no overrides exist and darkMode is false', async () => {
     mockedSettings = {
       darkMode: false
     }
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(buildRuntimeThemeMock).not.toHaveBeenCalled()
   })
 
-  test('defaults to darkTheme when settings.darkMode is missing', () => {
+  test('defaults to darkTheme when settings.darkMode is missing', async () => {
     mockedSettings = {}
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(buildRuntimeThemeMock).not.toHaveBeenCalled()
   })
 
-  test('onSetAppContext merges the patch into previous app context state', () => {
-    const tree = renderRootDirectly()
+  test('onSetAppContext merges the patch into previous app context state', async () => {
+    const tree = await renderRootDirectly()
 
     const onSetAppContext = tree.props.value.onSetAppContext as (patch: {
       isTouchDevice?: boolean
@@ -259,19 +259,19 @@ describe('renderer main bootstrap', () => {
     expect(updater({ isTouchDevice: true })).toEqual({ isTouchDevice: false })
   })
 
-  test('detects touch device via coarse pointer media query when maxTouchPoints is negative', () => {
+  test('detects touch device via coarse pointer media query when maxTouchPoints is negative', async () => {
     Object.defineProperty(navigator, 'maxTouchPoints', {
       configurable: true,
       value: -1
     })
 
-    const matchMediaMock = jest.fn().mockReturnValue({
+    const matchMediaMock = vi.fn().mockReturnValue({
       matches: true,
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn()
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
     })
 
     Object.defineProperty(window, 'matchMedia', {
@@ -279,7 +279,7 @@ describe('renderer main bootstrap', () => {
       value: matchMediaMock
     })
 
-    renderRootDirectly()
+    await renderRootDirectly()
 
     expect(matchMediaMock).toHaveBeenCalledWith('(pointer: coarse)')
   })

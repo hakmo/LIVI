@@ -2,11 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { UI } from '../../../constants'
 import { NavRail, type NavRailItem } from '../NavRail'
 
-jest.mock('@mui/material/styles', () => ({
+vi.mock('@mui/material/styles', () => ({
   useTheme: () => ({ palette: { primary: { main: '#0af' } } })
 }))
 
-jest.mock('@mui/material/Tabs', () => ({
+vi.mock('@mui/material/Tabs', () => ({
   __esModule: true,
   default: ({ children, onChange, value, ...rest }: any) => (
     <div data-testid="tabs" data-value={value} {...rest}>
@@ -18,7 +18,7 @@ jest.mock('@mui/material/Tabs', () => ({
   )
 }))
 
-jest.mock('@mui/material/Tab', () => ({
+vi.mock('@mui/material/Tab', () => ({
   __esModule: true,
   default: ({ icon, ...rest }: any) => (
     <button type="button" {...rest}>
@@ -50,14 +50,14 @@ describe('NavRail', () => {
   })
 
   test('clicking a tab calls onSelect with key + index', () => {
-    const onSelect = jest.fn()
+    const onSelect = vi.fn()
     render(<NavRail items={items} activeKey="home" onSelect={onSelect} />)
     fireEvent.click(screen.getByLabelText('Media'))
     expect(onSelect).toHaveBeenCalledWith('media', 1)
   })
 
   test('Tabs onChange also calls onSelect with the matching item', () => {
-    const onSelect = jest.fn()
+    const onSelect = vi.fn()
     render(<NavRail items={items} activeKey="home" onSelect={onSelect} />)
     fireEvent.click(screen.getByTestId('tabs-change-2'))
     expect(onSelect).toHaveBeenCalledWith('settings', 2)

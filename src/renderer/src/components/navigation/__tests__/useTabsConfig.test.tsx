@@ -9,7 +9,7 @@ let mockState = {
   settingsMissing: false
 }
 
-jest.mock('@mui/material/styles', () => ({
+vi.mock('@mui/material/styles', () => ({
   useTheme: () => ({
     palette: {
       text: { primary: '#fff', disabled: '#777' }
@@ -17,7 +17,7 @@ jest.mock('@mui/material/styles', () => ({
   })
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useStatusStore: (selector: (s: any) => unknown) =>
     selector({
       isStreaming: mockState.isStreaming,

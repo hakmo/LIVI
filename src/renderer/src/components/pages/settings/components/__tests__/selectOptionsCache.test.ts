@@ -10,7 +10,7 @@ const baseNode = {
   options: [{ value: 0, label: 'Static' }]
 } as const
 
-beforeEach(() => {
+beforeEach(async () => {
   _resetSelectOptionsCache()
 })
 
@@ -21,7 +21,7 @@ describe('selectOptionsCache', () => {
   })
 
   test('returns cached options on second call', async () => {
-    const load = jest.fn(async () => [{ value: 'a', label: 'A' }])
+    const load = vi.fn(async () => [{ value: 'a', label: 'A' }])
     const node = { path: 'p', options: [], loadOptions: load }
     await resolveOptions(node)
     await resolveOptions(node)
@@ -29,7 +29,7 @@ describe('selectOptionsCache', () => {
   })
 
   test('force: true bypasses the cache', async () => {
-    const load = jest
+    const load = vi
       .fn()
       .mockResolvedValueOnce([{ value: 'old', label: 'Old' }])
       .mockResolvedValueOnce([{ value: 'new', label: 'New' }])
@@ -43,7 +43,7 @@ describe('selectOptionsCache', () => {
 
   test('inflight de-dup: concurrent resolves only call loadOptions once', async () => {
     let resolveLoad!: (v: Array<{ value: string; label: string }>) => void
-    const load = jest.fn(
+    const load = vi.fn(
       () =>
         new Promise<Array<{ value: string; label: string }>>((res) => {
           resolveLoad = res
@@ -60,7 +60,7 @@ describe('selectOptionsCache', () => {
   })
 
   test('loadOptions rejection falls back to static options', async () => {
-    const load = jest.fn(async () => {
+    const load = vi.fn(async () => {
       throw new Error('ipc down')
     })
     const node = { path: 'p', options: [{ value: 1, label: 'Fallback' }], loadOptions: load }
@@ -68,14 +68,14 @@ describe('selectOptionsCache', () => {
     expect(got).toEqual([{ value: 1, label: 'Fallback' }])
   })
 
-  test('setCachedOptions / getCachedOptions round-trip', () => {
+  test('setCachedOptions / getCachedOptions round-trip', async () => {
     setCachedOptions({ path: 'p2' }, [{ value: 'x', label: 'X' }])
     expect(getCachedOptions({ path: 'p2' })).toEqual([{ value: 'x', label: 'X' }])
   })
 
   test('cache is per-path', async () => {
-    const loadA = jest.fn(async () => [{ value: 'a', label: 'A' }])
-    const loadB = jest.fn(async () => [{ value: 'b', label: 'B' }])
+    const loadA = vi.fn(async () => [{ value: 'a', label: 'A' }])
+    const loadB = vi.fn(async () => [{ value: 'b', label: 'B' }])
     await resolveOptions({ path: 'a', options: [], loadOptions: loadA })
     await resolveOptions({ path: 'b', options: [], loadOptions: loadB })
     expect(getCachedOptions({ path: 'a' })).toEqual([{ value: 'a', label: 'A' }])

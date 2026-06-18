@@ -8,11 +8,11 @@ describe('broadcastMediaKey', () => {
   })
 
   test('forwards the command to main via the app preload bridge', () => {
-    const broadcast = jest.fn()
+    const broadcast = vi.fn()
     ;(window as unknown as { app: { broadcastMediaKey: typeof broadcast } }).app = {
       broadcastMediaKey: broadcast
     }
-    const dispatchSpy = jest.spyOn(window, 'dispatchEvent')
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
 
     broadcastMediaKey('play')
 
@@ -24,7 +24,7 @@ describe('broadcastMediaKey', () => {
 
   test('falls back to a local CustomEvent when the preload bridge is unavailable', () => {
     ;(window as { app?: unknown }).app = undefined
-    const dispatchSpy = jest.spyOn(window, 'dispatchEvent')
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
 
     broadcastMediaKey('play')
 

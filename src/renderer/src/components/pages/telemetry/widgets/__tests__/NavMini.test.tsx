@@ -1,31 +1,32 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { NavMini } from '../NavMini'
 
 let onEventCb: ((event: unknown, ...args: unknown[]) => void) | undefined
-let unsubscribeMock: jest.Mock
+let unsubscribeMock: Mock
 
-const useLiviStoreMock = jest.fn()
-const translateNavigationMock = jest.fn()
-const useBlinkingTimeMock = jest.fn()
+const useLiviStoreMock = vi.fn()
+const translateNavigationMock = vi.fn()
+const useBlinkingTimeMock = vi.fn()
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (state: { settings: { language: string } }) => unknown) =>
     useLiviStoreMock(selector)
 }))
 
-jest.mock('@shared/utils/translateNavigation', () => ({
+vi.mock('@shared/utils/translateNavigation', () => ({
   translateNavigation: (...args: unknown[]) => translateNavigationMock(...args)
 }))
 
-jest.mock('../../../../../hooks/useBlinkingTime', () => ({
+vi.mock('../../../../../hooks/useBlinkingTime', () => ({
   useBlinkingTime: () => useBlinkingTimeMock()
 }))
 
 describe('NavMini', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     onEventCb = undefined
-    unsubscribeMock = jest.fn()
+    unsubscribeMock = vi.fn()
 
     useLiviStoreMock.mockImplementation((selector: (state: any) => unknown) =>
       selector({
@@ -51,14 +52,14 @@ describe('NavMini', () => {
     }))
     ;(window as any).projection = {
       ipc: {
-        readNavigation: jest.fn().mockResolvedValue({
+        readNavigation: vi.fn().mockResolvedValue({
           payload: {
             navi: {
               NaviStatus: 0
             }
           }
         }),
-        onEvent: jest.fn((cb: (event: unknown, ...args: unknown[]) => void) => {
+        onEvent: vi.fn((cb: (event: unknown, ...args: unknown[]) => void) => {
           onEventCb = cb
           return unsubscribeMock
         })
@@ -80,7 +81,7 @@ describe('NavMini', () => {
   })
 
   test('renders active navigation content after hydrate', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -101,7 +102,7 @@ describe('NavMini', () => {
   })
 
   test('passes normalized locale from settings into translateNavigation', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -127,7 +128,7 @@ describe('NavMini', () => {
         }
       })
     )
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -145,7 +146,7 @@ describe('NavMini', () => {
     expect(lastCall?.[1]).toBe('en')
   })
 
-  test('subscribes to projection events and unsubscribes on unmount', () => {
+  test('subscribes to projection events and unsubscribes on unmount', async () => {
     const { unmount } = render(<NavMini />)
 
     expect((window as any).projection.ipc.onEvent).toHaveBeenCalledTimes(1)
@@ -211,7 +212,7 @@ describe('NavMini', () => {
   })
 
   test('falls back to hydrate when navigation event patch cannot be unwrapped', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest
+    ;(window as any).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValueOnce({
         payload: {
@@ -253,7 +254,7 @@ describe('NavMini', () => {
   })
 
   test('renders maneuver image when NaviImageBase64 is present', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -278,7 +279,7 @@ describe('NavMini', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -302,7 +303,7 @@ describe('NavMini', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -316,7 +317,7 @@ describe('NavMini', () => {
   })
 
   test('hides destination distance in bottom row when maneuver image is present', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -332,7 +333,7 @@ describe('NavMini', () => {
   })
 
   test('keeps previous navigation state when hydrate throws', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest
+    ;(window as any).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValueOnce({
         payload: {
@@ -376,7 +377,7 @@ describe('NavMini', () => {
         TurnSide: undefined
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -402,7 +403,7 @@ describe('NavMini', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -428,7 +429,7 @@ describe('NavMini', () => {
         TurnSide: 0
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -454,7 +455,7 @@ describe('NavMini', () => {
         TurnSide: 1
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -480,7 +481,7 @@ describe('NavMini', () => {
         TurnSide: 1
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -506,7 +507,7 @@ describe('NavMini', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -556,11 +557,8 @@ describe('NavMini', () => {
       CurrentRoadName: '',
       codes: { ManeuverType: code, TurnSide: 1 }
     }))
-    ;(
-      window as { projection: { ipc: { readNavigation: jest.Mock } } }
-    ).projection.ipc.readNavigation = jest
-      .fn()
-      .mockResolvedValue({ payload: { navi: { NaviStatus: 1 } } })
+    ;(window as { projection: { ipc: { readNavigation: Mock } } }).projection.ipc.readNavigation =
+      vi.fn().mockResolvedValue({ payload: { navi: { NaviStatus: 1 } } })
     render(<NavMini />)
     await waitFor(() => {
       expect(screen.getByTestId(iconTestId)).toBeInTheDocument()

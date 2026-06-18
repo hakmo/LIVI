@@ -5,10 +5,10 @@ describe('iconUploader utils', () => {
     const originalFileReader = global.FileReader
     const originalImage = global.Image
 
-    afterEach(() => {
+    afterEach(async () => {
       global.FileReader = originalFileReader
       global.Image = originalImage
-      jest.restoreAllMocks()
+      vi.restoreAllMocks()
     })
 
     test('resolves with image after file is read successfully', async () => {
@@ -100,21 +100,21 @@ describe('iconUploader utils', () => {
   })
 
   describe('resizeImageToBase64Png', () => {
-    afterEach(() => {
-      jest.restoreAllMocks()
+    afterEach(async () => {
+      vi.restoreAllMocks()
     })
 
-    test('resizes image and returns base64 png without prefix', () => {
-      const clearRect = jest.fn()
-      const drawImage = jest.fn()
+    test('resizes image and returns base64 png without prefix', async () => {
+      const clearRect = vi.fn()
+      const drawImage = vi.fn()
 
-      const toDataURL = jest.fn(() => 'data:image/png;base64,encoded-png-data')
-      const getContext = jest.fn(() => ({
+      const toDataURL = vi.fn(() => 'data:image/png;base64,encoded-png-data')
+      const getContext = vi.fn(() => ({
         clearRect,
         drawImage
       }))
 
-      jest.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
         if (tagName === 'canvas') {
           return {
             width: 0,
@@ -141,10 +141,10 @@ describe('iconUploader utils', () => {
       expect(result).toBe('encoded-png-data')
     })
 
-    test('throws when canvas 2d context is unavailable', () => {
-      const getContext = jest.fn(() => null)
+    test('throws when canvas 2d context is unavailable', async () => {
+      const getContext = vi.fn(() => null)
 
-      jest.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
         if (tagName === 'canvas') {
           return {
             width: 0,

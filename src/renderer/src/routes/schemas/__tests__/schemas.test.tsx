@@ -1,28 +1,28 @@
-jest.mock('@renderer/components/pages/settings/pages/camera', () => ({
+vi.mock('@renderer/components/pages/settings/pages/camera', () => ({
   Camera: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/iconUploader/IconUploader', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/iconUploader/IconUploader', () => ({
   IconUploader: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/softwareUpdate/SoftwareUpdate', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/softwareUpdate/SoftwareUpdate', () => ({
   SoftwareUpdate: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/usbDongle/USBDongle', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/usbDongle/USBDongle', () => ({
   USBDongle: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/debug/Debug', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/debug/Debug', () => ({
   Debug: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/About', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/About', () => ({
   About: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/Restart', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/Restart', () => ({
   Restart: () => null
 }))
-jest.mock('@renderer/components/pages/settings/pages/system/PowerOff', () => ({
+vi.mock('@renderer/components/pages/settings/pages/system/PowerOff', () => ({
   PowerOff: () => null
 }))
-jest.mock('@renderer/components/pages/settings/SettingsPage', () => ({
+vi.mock('@renderer/components/pages/settings/SettingsPage', () => ({
   SettingsPage: () => null
 }))
 

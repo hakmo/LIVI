@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { SettingsFieldPage } from '../SettingsFieldPage'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => `t:${k}` })
 }))
 
-jest.mock('../SettingsFieldControl', () => ({
+vi.mock('../SettingsFieldControl', () => ({
   SettingsFieldControl: () => <div data-testid="field-control" />
 }))
 
@@ -22,7 +22,7 @@ describe('SettingsFieldPage', () => {
           } as any
         }
         value="x"
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />
     )
 
@@ -35,7 +35,7 @@ describe('SettingsFieldPage', () => {
       <SettingsFieldPage
         node={{ type: 'string', path: 'name', label: 'Name' } as any}
         value="x"
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />
     )
     expect(screen.getByTestId('field-control')).toBeInTheDocument()

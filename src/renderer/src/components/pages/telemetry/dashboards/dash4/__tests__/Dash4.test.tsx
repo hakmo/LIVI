@@ -1,8 +1,8 @@
 import { render } from '@testing-library/react'
 
-const setClusterDashActive = jest.fn()
+const setClusterDashActive = vi.fn()
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useStatusStore: (selector: (s: { setClusterDashActive: (v: boolean) => void }) => unknown) =>
     selector({ setClusterDashActive })
 }))

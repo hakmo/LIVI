@@ -1,6 +1,6 @@
 describe('telemetry widgets index', () => {
-  test('re-exports all widgets', () => {
-    const mod = require('../index')
+  test('re-exports all widgets', async () => {
+    const mod = await import('../index')
 
     expect(mod).toHaveProperty('CoolantTemp')
     expect(mod).toHaveProperty('FuelLevel')

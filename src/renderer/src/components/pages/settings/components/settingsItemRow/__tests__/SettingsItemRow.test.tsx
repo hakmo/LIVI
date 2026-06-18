@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { SettingsItemRow } from '../SettingsItemRow'
 
-jest.mock('../../stackItem', () => ({
+vi.mock('../../stackItem', () => ({
   StackItem: ({ children }: any) => <div data-testid="stack-item">{children}</div>
 }))
 

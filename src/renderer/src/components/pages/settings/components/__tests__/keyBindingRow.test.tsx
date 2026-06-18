@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { KeyBindingRow } from '../keyBindingRow'
 
-const mockSaveSettings = jest.fn()
+const mockSaveSettings = vi.fn()
 let mockSettings: any = null
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) =>
     selector({
       saveSettings: mockSaveSettings,
@@ -12,11 +12,11 @@ jest.mock('@store/store', () => ({
     })
 }))
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (x: string) => `t:${x}` })
 }))
 
-jest.mock('../stackItem', () => ({
+vi.mock('../stackItem', () => ({
   StackItem: ({ children, onClick }: { children: React.ReactNode; onClick: () => void }) => (
     <div role="button" data-testid="stack-item" onClick={onClick}>
       {children}
@@ -25,8 +25,8 @@ jest.mock('../stackItem', () => ({
 }))
 
 describe('KeyBindingRow', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     mockSettings = {
       bindings: { next: 'MediaNextTrack' }
     }

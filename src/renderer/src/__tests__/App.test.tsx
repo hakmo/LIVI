@@ -2,22 +2,22 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import App from '../App'
 import { AppContext } from '../context'
 
-const navigateMock = jest.fn()
-const useKeyDownHandler = jest.fn()
-const updateCamerasMock = jest.fn()
-const listenForEvents = jest.fn()
-const unlistenForEvents = jest.fn()
-const focusFirstInMainMock = jest.fn()
+const navigateMock = vi.fn()
+const useKeyDownHandler = vi.fn()
+const updateCamerasMock = vi.fn()
+const listenForEvents = vi.fn()
+const unlistenForEvents = vi.fn()
+const focusFirstInMainMock = vi.fn()
 let mockPathname = '/'
 
-jest.mock('react-router', () => ({
+vi.mock('react-router', () => ({
   HashRouter: ({ children }: any) => <div data-testid="router">{children}</div>,
   useLocation: () => ({ pathname: mockPathname }),
   useRoutes: () => <div data-testid="routes">routes</div>,
   useNavigate: () => navigateMock
 }))
 
-jest.mock('../components/pages', () => ({
+vi.mock('../components/pages', () => ({
   Projection: (props: any) => (
     <div
       data-testid="projection"
@@ -27,10 +27,15 @@ jest.mock('../components/pages', () => ({
       {String(props.receivingVideo)}
     </div>
   ),
-  Cluster: () => <div data-testid="cluster" />
+  Cluster: () => <div data-testid="cluster" />,
+  Home: () => <div data-testid="home" />,
+  Media: () => <div data-testid="media" />,
+  Camera: () => <div data-testid="camera" />,
+  Maps: () => <div data-testid="maps" />,
+  Telemetry: () => <div data-testid="telemetry" />
 }))
 
-jest.mock('../components/layouts/AppLayout', () => ({
+vi.mock('../components/layouts/AppLayout', () => ({
   AppLayout: ({ children, navRef, mainRef }: any) => (
     <div data-testid="app-layout">
       <div data-testid="nav-slot" ref={navRef} />
@@ -41,17 +46,17 @@ jest.mock('../components/layouts/AppLayout', () => ({
   )
 }))
 
-jest.mock('../utils/cameraDetection', () => ({
+vi.mock('../utils/cameraDetection', () => ({
   updateCameras: (...args: unknown[]) => updateCamerasMock(...args)
 }))
 
-jest.mock('../hooks', () => ({
-  useActiveControl: () => jest.fn(),
+vi.mock('../hooks', () => ({
+  useActiveControl: () => vi.fn(),
   useFocus: () => ({
     isFormField: () => false,
-    focusSelectedNav: jest.fn(),
+    focusSelectedNav: vi.fn(),
     focusFirstInMain: focusFirstInMainMock,
-    moveFocusLinear: jest.fn()
+    moveFocusLinear: vi.fn()
   }),
   useKeyDown: () => useKeyDownHandler
 }))
@@ -62,33 +67,34 @@ const liviState: any = {
     language: 'en',
     bindings: { back: 'KeyB', selectDown: 'Enter' }
   },
-  saveSettings: jest.fn()
+  saveSettings: vi.fn()
 }
 const statusState: any = {
-  setCameraFound: jest.fn(),
+  setCameraFound: vi.fn(),
   reverse: false,
   cameraFound: false
 }
 
-jest.mock('../store/store', () => ({
+vi.mock('../store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) => selector(liviState),
   useStatusStore: (selector: (s: any) => unknown) => selector(statusState)
 }))
 
-jest.mock('../utils/broadcastMediaKey', () => ({
-  broadcastMediaKey: jest.fn()
+vi.mock('../utils/broadcastMediaKey', () => ({
+  broadcastMediaKey: vi.fn()
 }))
 
-jest.mock('../utils/windowRole', () => ({
-  getWindowRole: jest.fn(() => 'main')
+vi.mock('../utils/windowRole', () => ({
+  getWindowRole: vi.fn(() => 'main')
 }))
 
-jest.mock('i18next', () => ({
-  changeLanguage: jest.fn()
+vi.mock('i18next', () => ({
+  default: { changeLanguage: vi.fn() },
+  changeLanguage: vi.fn()
 }))
 
 describe('App', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     navigateMock.mockReset()
     useKeyDownHandler.mockReset()
     updateCamerasMock.mockReset()
@@ -101,7 +107,7 @@ describe('App', () => {
       language: 'en',
       bindings: { back: 'KeyB', selectDown: 'Enter' }
     }
-    liviState.saveSettings = jest.fn()
+    liviState.saveSettings = vi.fn()
     statusState.reverse = false
     statusState.cameraFound = false
     ;(window as any).projection = {
@@ -113,15 +119,15 @@ describe('App', () => {
     ;(window as any).app = undefined
   })
 
-  test('does not redirect from configured start page when current route is not home', () => {
+  test('does not redirect from configured start page when current route is not home', async () => {
     mockPathname = '/settings'
     render(<App />)
 
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
-  test('sets navEl and contentEl via app context when they are missing', () => {
-    const onSetAppContext = jest.fn()
+  test('sets navEl and contentEl via app context when they are missing', async () => {
+    const onSetAppContext = vi.fn()
 
     render(
       <AppContext.Provider
@@ -146,8 +152,8 @@ describe('App', () => {
     )
   })
 
-  test('focuses first element in main after route change away from home when using keys', () => {
-    const rafSpy = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: any) => {
+  test('focuses first element in main after route change away from home when using keys', async () => {
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: any) => {
       cb()
       return 1
     })
@@ -174,7 +180,7 @@ describe('App', () => {
     rafSpy.mockRestore()
   })
 
-  test('closes nav video overlay on bound back key', () => {
+  test('closes nav video overlay on bound back key', async () => {
     mockPathname = '/media'
 
     render(
@@ -194,7 +200,7 @@ describe('App', () => {
     expect(screen.getByTestId('projection')).toHaveAttribute('data-nav-overlay-active', 'false')
   })
 
-  test('updates cameras again for matching usb event types only', () => {
+  test('updates cameras again for matching usb event types only', async () => {
     render(<App />)
 
     const usbHandler = listenForEvents.mock.calls[0][0]
@@ -210,9 +216,9 @@ describe('App', () => {
     expect(updateCamerasMock).not.toHaveBeenCalled()
   })
 
-  test('removes global input listeners on unmount', () => {
-    const addSpy = jest.spyOn(document, 'addEventListener')
-    const removeSpy = jest.spyOn(document, 'removeEventListener')
+  test('removes global input listeners on unmount', async () => {
+    const addSpy = vi.spyOn(document, 'addEventListener')
+    const removeSpy = vi.spyOn(document, 'removeEventListener')
 
     const { unmount } = render(<App />)
     unmount()
@@ -226,7 +232,7 @@ describe('App', () => {
     removeSpy.mockRestore()
   })
 
-  test('sets input mode to mouse on mouse pointerdown and to touch on non-mouse pointerdown', () => {
+  test('sets input mode to mouse on mouse pointerdown and to touch on non-mouse pointerdown', async () => {
     render(<App />)
 
     const mouseEvent = new Event('pointerdown', { bubbles: true, cancelable: true })
@@ -242,8 +248,8 @@ describe('App', () => {
     expect(document.documentElement.dataset.input).toBe('touch')
   })
 
-  test('clears focused field in app context when focus moves away on non-touch devices', () => {
-    const onSetAppContext = jest.fn()
+  test('clears focused field in app context when focus moves away on non-touch devices', async () => {
+    const onSetAppContext = vi.fn()
 
     render(
       <AppContext.Provider
@@ -277,7 +283,7 @@ describe('App', () => {
   })
 
   test('sets navEl and contentEl in app context when they are missing', async () => {
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
 
     render(
       <AppContext.Provider
@@ -312,33 +318,33 @@ describe('App', () => {
     )
   })
 
-  test('window.app.onMediaKey forwards incoming commands to a car-media-key event', () => {
+  test('window.app.onMediaKey forwards incoming commands to a car-media-key event', async () => {
     let captured: ((cmd: string) => void) | null = null
     ;(window as any).app = {
-      onMediaKey: jest.fn((cb: (c: string) => void) => {
+      onMediaKey: vi.fn((cb: (c: string) => void) => {
         captured = cb
         return () => {}
       })
     }
     render(<App />)
     expect((window as any).app.onMediaKey).toHaveBeenCalled()
-    const listener = jest.fn()
+    const listener = vi.fn()
     window.addEventListener('car-media-key', listener as never)
     captured!('next')
     expect(listener).toHaveBeenCalled()
     window.removeEventListener('car-media-key', listener as never)
   })
 
-  test('mounts cleanly when window.app is missing', () => {
+  test('mounts cleanly when window.app is missing', async () => {
     expect(() => render(<App />)).not.toThrow()
   })
 
-  test('PTT keyup after keydown fires voiceAssistantRelease', () => {
+  test('PTT keyup after keydown fires voiceAssistantRelease', async () => {
     liviState.settings = {
       ...liviState.settings,
       bindings: { ...liviState.settings.bindings, voiceAssistant: 'KeyV' }
     }
-    const { broadcastMediaKey } = jest.requireMock('../utils/broadcastMediaKey')
+    const { broadcastMediaKey } = await vi.importMock('../utils/broadcastMediaKey')
     render(<App />)
     act(() => {
       fireEvent.keyDown(document, { code: 'KeyV' })
@@ -350,12 +356,12 @@ describe('App', () => {
     expect(broadcastMediaKey).toHaveBeenCalledWith('voiceAssistantRelease')
   })
 
-  test('PTT repeat keydown does not arm a release on a fresh press', () => {
+  test('PTT repeat keydown does not arm a release on a fresh press', async () => {
     liviState.settings = {
       ...liviState.settings,
       bindings: { ...liviState.settings.bindings, voiceAssistant: 'KeyV' }
     }
-    const { broadcastMediaKey } = jest.requireMock('../utils/broadcastMediaKey')
+    const { broadcastMediaKey } = await vi.importMock('../utils/broadcastMediaKey')
     render(<App />)
     // Only repeat keydowns — never armed → keyup is a no-op
     fireEvent.keyDown(document, { code: 'KeyV', repeat: true })
@@ -364,12 +370,12 @@ describe('App', () => {
     expect(broadcastMediaKey).not.toHaveBeenCalled()
   })
 
-  test('PTT release fires on window blur after a press', () => {
+  test('PTT release fires on window blur after a press', async () => {
     liviState.settings = {
       ...liviState.settings,
       bindings: { ...liviState.settings.bindings, voiceAssistant: 'KeyV' }
     }
-    const { broadcastMediaKey } = jest.requireMock('../utils/broadcastMediaKey')
+    const { broadcastMediaKey } = await vi.importMock('../utils/broadcastMediaKey')
     render(<App />)
     act(() => {
       fireEvent.keyDown(document, { code: 'KeyV' })
@@ -381,12 +387,12 @@ describe('App', () => {
     expect(broadcastMediaKey).toHaveBeenCalledWith('voiceAssistantRelease')
   })
 
-  test('PTT release fires when document goes hidden', () => {
+  test('PTT release fires when document goes hidden', async () => {
     liviState.settings = {
       ...liviState.settings,
       bindings: { ...liviState.settings.bindings, voiceAssistant: 'KeyV' }
     }
-    const { broadcastMediaKey } = jest.requireMock('../utils/broadcastMediaKey')
+    const { broadcastMediaKey } = await vi.importMock('../utils/broadcastMediaKey')
     render(<App />)
     act(() => {
       fireEvent.keyDown(document, { code: 'KeyV' })
@@ -402,7 +408,7 @@ describe('App', () => {
     expect(broadcastMediaKey).toHaveBeenCalledWith('voiceAssistantRelease')
   })
 
-  test('reverse + camera ready auto-switches to /camera', () => {
+  test('reverse + camera ready auto-switches to /camera', async () => {
     liviState.settings = {
       ...liviState.settings,
       autoSwitchOnReverse: true,
@@ -416,7 +422,7 @@ describe('App', () => {
     expect(navigateMock).toHaveBeenCalledWith('/camera')
   })
 
-  test('does not auto-switch when autoSwitchOnReverse is off', () => {
+  test('does not auto-switch when autoSwitchOnReverse is off', async () => {
     liviState.settings = {
       ...liviState.settings,
       autoSwitchOnReverse: false,
@@ -430,7 +436,7 @@ describe('App', () => {
     expect(navigateMock).not.toHaveBeenCalledWith('/camera')
   })
 
-  test('does not auto-switch when the camera tab is not enabled for the role', () => {
+  test('does not auto-switch when the camera tab is not enabled for the role', async () => {
     liviState.settings = {
       ...liviState.settings,
       autoSwitchOnReverse: true,
@@ -444,7 +450,7 @@ describe('App', () => {
     expect(navigateMock).not.toHaveBeenCalledWith('/camera')
   })
 
-  test('reverse off after an auto-switch navigates back to the prior route', () => {
+  test('reverse off after an auto-switch navigates back to the prior route', async () => {
     liviState.settings = {
       ...liviState.settings,
       autoSwitchOnReverse: true,

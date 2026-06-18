@@ -1,29 +1,30 @@
 import { act, renderHook } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { useMediaState } from '../../hooks'
 import { clamp, mergePayload, payloadFromLiveEvent } from '../../utils'
 
-jest.mock('../../utils/clamp', () => ({
-  clamp: jest.fn((n: number, min: number, max: number) => Math.max(min, Math.min(max, n)))
+vi.mock('../../utils/clamp', () => ({
+  clamp: vi.fn((n: number, min: number, max: number) => Math.max(min, Math.min(max, n)))
 }))
-jest.mock('../../utils/mergePayload', () => ({
-  mergePayload: jest.fn()
+vi.mock('../../utils/mergePayload', () => ({
+  mergePayload: vi.fn()
 }))
-jest.mock('../../utils/payloadFromLiveEvent', () => ({
-  payloadFromLiveEvent: jest.fn()
+vi.mock('../../utils/payloadFromLiveEvent', () => ({
+  payloadFromLiveEvent: vi.fn()
 }))
 
-const mockReadMedia = jest.fn()
-const mockOnEvent = jest.fn()
-const mockRemoveListener = jest.fn()
+const mockReadMedia = vi.fn()
+const mockOnEvent = vi.fn()
+const mockRemoveListener = vi.fn()
 
-beforeEach(() => {
-  jest.useFakeTimers()
+beforeEach(async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
 
-  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
     setTimeout(() => cb(performance.now()), 16)
     return 1
   })
-  jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error
   ;(window as never).projection = {
@@ -43,18 +44,18 @@ beforeEach(() => {
   mockReadMedia.mockReset()
   mockOnEvent.mockReset()
   mockRemoveListener.mockReset()
-  ;(clamp as jest.Mock).mockClear()
-  ;(mergePayload as jest.Mock).mockClear()
-  ;(payloadFromLiveEvent as jest.Mock).mockClear()
+  ;(clamp as Mock).mockClear()
+  ;(mergePayload as Mock).mockClear()
+  ;(payloadFromLiveEvent as Mock).mockClear()
 })
 
-afterEach(() => {
-  jest.useRealTimers()
-  jest.restoreAllMocks()
+afterEach(async () => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('useMediaState', () => {
-  it('returns initial state', () => {
+  it('returns initial state', async () => {
     const { result } = renderHook(() => useMediaState(false))
     expect(result.current.snap).toBeNull()
     expect(result.current.livePlayMs).toBe(0)
@@ -80,8 +81,8 @@ describe('useMediaState', () => {
     expect(result.current.livePlayMs).toBe(123)
   })
 
-  it('subscribes to projection events and unsubscribes on unmount', () => {
-    const unsubscribe = jest.fn()
+  it('subscribes to projection events and unsubscribes on unmount', async () => {
+    const unsubscribe = vi.fn()
     mockOnEvent.mockReturnValueOnce(unsubscribe)
 
     const { unmount } = renderHook(() => useMediaState(false))
@@ -91,7 +92,7 @@ describe('useMediaState', () => {
     expect(unsubscribe).toHaveBeenCalled()
   })
 
-  it('falls back to electron.removeListener when unsubscribe not provided', () => {
+  it('falls back to electron.removeListener when unsubscribe not provided', async () => {
     mockOnEvent.mockReturnValueOnce(undefined)
 
     const { unmount } = renderHook(() => useMediaState(false))
@@ -100,11 +101,11 @@ describe('useMediaState', () => {
     expect(mockRemoveListener).toHaveBeenCalledWith('projection-event', expect.any(Function))
   })
 
-  it('handles unplugged event correctly', () => {
+  it('handles unplugged event correctly', async () => {
     let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
     mockOnEvent.mockImplementationOnce((cb) => {
       handler = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     const { result } = renderHook(() => useMediaState(false))
@@ -117,11 +118,11 @@ describe('useMediaState', () => {
     expect(result.current.livePlayMs).toBe(0)
   })
 
-  it('handles valid live event and updates state', () => {
+  it('handles valid live event and updates state', async () => {
     let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
     mockOnEvent.mockImplementationOnce((cb) => {
       handler = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     const inc = {
@@ -133,8 +134,8 @@ describe('useMediaState', () => {
       media: { MediaSongPlayTime: 50 }
     }
 
-    ;(payloadFromLiveEvent as jest.Mock).mockReturnValue(inc)
-    ;(mergePayload as jest.Mock).mockReturnValue(merged)
+    ;(payloadFromLiveEvent as Mock).mockReturnValue(inc)
+    ;(mergePayload as Mock).mockReturnValue(merged)
 
     const { result } = renderHook(() => useMediaState(false))
 
@@ -148,13 +149,13 @@ describe('useMediaState', () => {
     expect(result.current.snap?.payload.media?.MediaSongPlayTime).toBe(50)
   })
 
-  it('does not call mergePayload when payloadFromLiveEvent returns null', () => {
+  it('does not call mergePayload when payloadFromLiveEvent returns null', async () => {
     let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
     mockOnEvent.mockImplementationOnce((cb) => {
       handler = cb
-      return jest.fn()
+      return vi.fn()
     })
-    ;(payloadFromLiveEvent as jest.Mock).mockReturnValue(null)
+    ;(payloadFromLiveEvent as Mock).mockReturnValue(null)
 
     renderHook(() => useMediaState(false))
 
@@ -188,7 +189,7 @@ describe('useMediaState', () => {
     // advance multiple frames — await act each iteration to avoid warning
     for (let i = 0; i < 5; i++) {
       await act(async () => {
-        jest.advanceTimersByTime(50)
+        vi.advanceTimersByTime(50)
         await Promise.resolve()
       })
     }
@@ -216,7 +217,7 @@ describe('useMediaState', () => {
 
     for (let i = 0; i < 5; i++) {
       await act(async () => {
-        jest.advanceTimersByTime(50)
+        vi.advanceTimersByTime(50)
         await Promise.resolve()
       })
     }
@@ -224,13 +225,13 @@ describe('useMediaState', () => {
     expect(clamp).not.toHaveBeenCalled()
   })
 
-  it('reuses previous play time when incoming media event has no MediaSongPlayTime', () => {
+  it('reuses previous play time when incoming media event has no MediaSongPlayTime', async () => {
     let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
     mockOnEvent.mockImplementationOnce((cb) => {
       handler = cb
-      return jest.fn()
+      return vi.fn()
     })
-    ;(payloadFromLiveEvent as jest.Mock)
+    ;(payloadFromLiveEvent as Mock)
       .mockReturnValueOnce({
         type: 1,
         media: { MediaSongPlayTime: 123 }
@@ -239,7 +240,7 @@ describe('useMediaState', () => {
         type: 1,
         media: {}
       })
-    ;(mergePayload as jest.Mock)
+    ;(mergePayload as Mock)
       .mockReturnValueOnce({
         type: 1,
         media: { MediaSongPlayTime: 123 }
@@ -266,17 +267,17 @@ describe('useMediaState', () => {
     expect(result.current.snap?.payload.media?.MediaSongPlayTime).toBeUndefined()
   })
 
-  it('falls back to 0 when incoming media event has no MediaSongPlayTime and previous play time is not a number', () => {
+  it('falls back to 0 when incoming media event has no MediaSongPlayTime and previous play time is not a number', async () => {
     let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
     mockOnEvent.mockImplementationOnce((cb) => {
       handler = cb
-      return jest.fn()
+      return vi.fn()
     })
-    ;(payloadFromLiveEvent as jest.Mock).mockReturnValue({
+    ;(payloadFromLiveEvent as Mock).mockReturnValue({
       type: 1,
       media: {}
     })
-    ;(mergePayload as jest.Mock).mockReturnValue({
+    ;(mergePayload as Mock).mockReturnValue({
       type: 1,
       media: {}
     })

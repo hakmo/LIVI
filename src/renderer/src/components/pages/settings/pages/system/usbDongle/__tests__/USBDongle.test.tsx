@@ -16,7 +16,7 @@ const state = {
   isDongleConnected: true,
   isStreaming: false,
   settings: { dongleToolsIp: '' },
-  saveSettings: jest.fn().mockResolvedValue(undefined),
+  saveSettings: vi.fn().mockResolvedValue(undefined),
   vendorId: 0x1234,
   productId: 0xabcd,
   usbFwVersion: '1.0.0',
@@ -35,7 +35,7 @@ const state = {
   audioBitDepth: 16
 }
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (k: string, vars?: Record<string, unknown>) => {
       if (!vars) return k
@@ -44,7 +44,7 @@ jest.mock('react-i18next', () => ({
   })
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useStatusStore: (selector: (s: any) => unknown) =>
     selector({ isDongleConnected: state.isDongleConnected, isStreaming: state.isStreaming }),
   useLiviStore: (selector: (s: any) => unknown) =>
@@ -65,13 +65,13 @@ jest.mock('@store/store', () => ({
     })
 }))
 
-jest.mock('@renderer/hooks/useNetworkStatus', () => ({
-  useNetworkStatus: jest.fn(() => ({ online: true, type: 'wifi', effectiveType: '4g' }))
+vi.mock('@renderer/hooks/useNetworkStatus', () => ({
+  useNetworkStatus: vi.fn(() => ({ online: true, type: 'wifi', effectiveType: '4g' }))
 }))
 
 describe('USBDongle', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     state.isDongleConnected = true
     state.isStreaming = false
     state.settings = { dongleToolsIp: '' }
@@ -81,24 +81,24 @@ describe('USBDongle', () => {
     onEventCb = undefined
     ;(window as any).projection = {
       ipc: {
-        dongleFirmware: jest.fn(async (action: string) => ({
+        dongleFirmware: vi.fn(async (action: string) => ({
           ok: true,
           raw: { err: 0, ver: action === 'check' ? '2025.02.01.0001' : '-' },
           request: { local: { ok: true, ready: false, reason: 'missing' } }
         })),
-        onEvent: jest.fn((cb: any) => {
+        onEvent: vi.fn((cb: any) => {
           onEventCb = cb
         }),
-        offEvent: jest.fn()
+        offEvent: vi.fn()
       },
       usb: {
-        uploadLiviScripts: jest
+        uploadLiviScripts: vi
           .fn()
           .mockResolvedValue({ ok: true, cgiOk: true, webOk: true, urls: [] })
       }
     }
     ;(window as any).app = {
-      openExternal: jest.fn().mockResolvedValue({ ok: true })
+      openExternal: vi.fn().mockResolvedValue({ ok: true })
     }
   })
 
@@ -139,7 +139,7 @@ describe('USBDongle', () => {
     expect(screen.getByText('50% • 1 KB / 2 KB')).toBeInTheDocument()
   })
 
-  test('renders device list entries from box info', () => {
+  test('renders device list entries from box info', async () => {
     state.boxInfo = {
       uuid: 'u1',
       MFD: 'mfd',
@@ -164,7 +164,7 @@ describe('USBDongle', () => {
     expect(screen.getByText('AA:BB')).toBeInTheDocument()
   })
 
-  test('renders fallback device list row when no devices exist', () => {
+  test('renders fallback device list row when no devices exist', async () => {
     state.boxInfo = {
       uuid: 'u1',
       MFD: 'mfd',
@@ -178,7 +178,7 @@ describe('USBDongle', () => {
   })
 
   test('shows changelog button enabled and opens vendor changelog dialog', async () => {
-    ;(window as any).projection.ipc.dongleFirmware = jest.fn(async (action: string) => ({
+    ;(window as any).projection.ipc.dongleFirmware = vi.fn(async (action: string) => ({
       ok: true,
       raw: {
         err: 0,
@@ -201,7 +201,7 @@ describe('USBDongle', () => {
   })
 
   test('download button opens ready dialog immediately when firmware is already downloaded', async () => {
-    ;(window as any).projection.ipc.dongleFirmware = jest.fn(async (action: string) => {
+    ;(window as any).projection.ipc.dongleFirmware = vi.fn(async (action: string) => {
       if (action === 'status' || action === 'download') {
         return {
           ok: true,
@@ -240,7 +240,7 @@ describe('USBDongle', () => {
   })
 
   test('upload button is disabled when local firmware is not ready', async () => {
-    ;(window as any).projection.ipc.dongleFirmware = jest.fn(async () => ({
+    ;(window as any).projection.ipc.dongleFirmware = vi.fn(async () => ({
       ok: true,
       raw: { err: 0, ver: '2025.02.01.0001' },
       request: {
@@ -259,7 +259,7 @@ describe('USBDongle', () => {
   })
 
   test('enables dev tools, saves configured IP and opens matching URL', async () => {
-    ;(window as any).projection.usb.uploadLiviScripts = jest.fn().mockResolvedValue({
+    ;(window as any).projection.usb.uploadLiviScripts = vi.fn().mockResolvedValue({
       ok: true,
       cgiOk: true,
       webOk: true,
@@ -304,7 +304,7 @@ describe('USBDongle', () => {
   })
 
   test('shows partial alert when dev tools upload succeeds only partially', async () => {
-    ;(window as any).projection.usb.uploadLiviScripts = jest.fn().mockResolvedValue({
+    ;(window as any).projection.usb.uploadLiviScripts = vi.fn().mockResolvedValue({
       ok: false,
       cgiOk: true,
       webOk: false,
@@ -322,13 +322,13 @@ describe('USBDongle', () => {
 
   test('shows candidate URLs when no URL was opened but upload returned candidates', async () => {
     state.settings = { dongleToolsIp: '' }
-    ;(window as any).projection.usb.uploadLiviScripts = jest.fn().mockResolvedValue({
+    ;(window as any).projection.usb.uploadLiviScripts = vi.fn().mockResolvedValue({
       ok: true,
       cgiOk: true,
       webOk: true,
       urls: ['http://10.0.0.5/cgi-bin/server.cgi?action=ls&path=/', 'http://10.0.0.5/index.html']
     })
-    ;(window as any).app.openExternal = jest.fn().mockResolvedValue({ ok: false, error: 'blocked' })
+    ;(window as any).app.openExternal = vi.fn().mockResolvedValue({ ok: false, error: 'blocked' })
 
     render(<USBDongle />)
 
@@ -356,7 +356,7 @@ describe('USBDongle', () => {
     expect(screen.queryByText('settings.devToolsEnabled')).not.toBeInTheDocument()
   })
   test('auto closes firmware dialog after download is ready with saved message', async () => {
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
     render(<USBDongle />)
 
@@ -374,18 +374,18 @@ describe('USBDongle', () => {
     expect(screen.getByText('Saved to: /tmp/fw.bin')).toBeInTheDocument()
 
     act(() => {
-      jest.advanceTimersByTime(900)
+      vi.advanceTimersByTime(900)
     })
 
     await waitFor(() => {
       expect(screen.queryByText('Dongle Firmware')).not.toBeInTheDocument()
     })
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   test('closes firmware dialog after upload finished and dongle disconnects then reconnects', async () => {
-    ;(window as any).projection.ipc.dongleFirmware = jest.fn(async (action: string) => {
+    ;(window as any).projection.ipc.dongleFirmware = vi.fn(async (action: string) => {
       if (action === 'status') {
         return {
           ok: true,

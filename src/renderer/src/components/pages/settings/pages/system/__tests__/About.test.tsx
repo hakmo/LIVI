@@ -3,7 +3,7 @@ import { About } from '../About'
 ;(globalThis as any).__BUILD_RUN__ = '123'
 ;(globalThis as any).__BUILD_SHA__ = 'abcdef0'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fb?: string) => fb ?? key
   })
@@ -39,7 +39,7 @@ describe('About page', () => {
 })
 
 // Test the helper functions via a mock of package.json
-jest.mock(
+vi.mock(
   '../../../../../../../../../package.json',
   () => ({
     name: 'test-app',

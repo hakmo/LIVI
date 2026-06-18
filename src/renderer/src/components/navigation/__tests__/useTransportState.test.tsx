@@ -1,26 +1,25 @@
 import { act, renderHook } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { useTransportState } from '../useTransportState'
 
 type Handler = (...args: unknown[]) => void
 
-function installProjection(
-  over: { getState?: jest.Mock; onEvent?: jest.Mock; offEvent?: jest.Mock } = {}
-) {
+function installProjection(over: { getState?: Mock; onEvent?: Mock; offEvent?: Mock } = {}) {
   const ipc = {
-    getTransportState: over.getState ?? jest.fn(async () => null),
-    onEvent: over.onEvent ?? jest.fn(),
-    offEvent: over.offEvent ?? jest.fn()
+    getTransportState: over.getState ?? vi.fn(async () => null),
+    onEvent: over.onEvent ?? vi.fn(),
+    offEvent: over.offEvent ?? vi.fn()
   }
   ;(window as unknown as { projection: { ipc: typeof ipc } }).projection = { ipc }
   return ipc
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   delete (window as unknown as { projection?: unknown }).projection
 })
 
 describe('useTransportState', () => {
-  test('initial state is the static INITIAL constant', () => {
+  test('initial state is the static INITIAL constant', async () => {
     installProjection()
     const { result } = renderHook(() => useTransportState())
     expect(result.current).toEqual({
@@ -37,7 +36,7 @@ describe('useTransportState', () => {
     })
   })
 
-  test('no-op when window.projection is missing', () => {
+  test('no-op when window.projection is missing', async () => {
     const { result } = renderHook(() => useTransportState())
     expect(result.current.active).toBeNull()
   })
@@ -51,7 +50,7 @@ describe('useTransportState', () => {
       wiredPhoneActive: false,
       preference: 'native' as const
     }
-    installProjection({ getState: jest.fn(async () => initial) })
+    installProjection({ getState: vi.fn(async () => initial) })
     const { result } = renderHook(() => useTransportState())
     // Wait for promise microtask
     await act(async () => {
@@ -61,7 +60,7 @@ describe('useTransportState', () => {
   })
 
   test('handles getTransportState rejection silently', async () => {
-    installProjection({ getState: jest.fn(async () => Promise.reject(new Error('nope'))) })
+    installProjection({ getState: vi.fn(async () => Promise.reject(new Error('nope'))) })
     const { result } = renderHook(() => useTransportState())
     await act(async () => {
       await Promise.resolve()
@@ -71,7 +70,7 @@ describe('useTransportState', () => {
 
   test('updates state on a "transportState" IPC event', () => {
     let captured: Handler | null = null
-    const onEvent = jest.fn((h: Handler) => {
+    const onEvent = vi.fn((h: Handler) => {
       captured = h
     })
     installProjection({ onEvent })
@@ -92,10 +91,10 @@ describe('useTransportState', () => {
     expect(result.current).toEqual(payload)
   })
 
-  test('ignores IPC events of unrelated type', () => {
+  test('ignores IPC events of unrelated type', async () => {
     let captured: Handler | null = null
     installProjection({
-      onEvent: jest.fn((h: Handler) => {
+      onEvent: vi.fn((h: Handler) => {
         captured = h
       })
     })
@@ -106,11 +105,11 @@ describe('useTransportState', () => {
     expect(result.current.active).toBeNull()
   })
 
-  test('unmount calls offEvent with the same handler', () => {
+  test('unmount calls offEvent with the same handler', async () => {
     let captured: Handler | null = null
-    const offEvent = jest.fn()
+    const offEvent = vi.fn()
     installProjection({
-      onEvent: jest.fn((h: Handler) => {
+      onEvent: vi.fn((h: Handler) => {
         captured = h
       }),
       offEvent
@@ -120,10 +119,10 @@ describe('useTransportState', () => {
     expect(offEvent).toHaveBeenCalledWith(captured)
   })
 
-  test('survives missing offEvent on unmount', () => {
+  test('survives missing offEvent on unmount', async () => {
     const ipc = {
-      getTransportState: jest.fn(async () => null),
-      onEvent: jest.fn()
+      getTransportState: vi.fn(async () => null),
+      onEvent: vi.fn()
     }
     ;(window as unknown as { projection: { ipc: typeof ipc } }).projection = { ipc }
     const { unmount } = renderHook(() => useTransportState())

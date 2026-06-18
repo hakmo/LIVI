@@ -1,11 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
 import { useSmartSettings } from '../useSmartSettings'
 
-const saveSettings = jest.fn()
-const markRestartBaseline = jest.fn()
+const saveSettings = vi.fn()
+const markRestartBaseline = vi.fn()
 let isDongleConnected = true
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) =>
     selector({
       saveSettings,
@@ -16,14 +16,14 @@ jest.mock('@store/store', () => ({
 }))
 
 describe('useSmartSettings', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     saveSettings.mockReset()
     markRestartBaseline.mockReset()
     isDongleConnected = true
-    ;(window as any).projection = { usb: { forceReset: jest.fn().mockResolvedValue(true) } }
+    ;(window as any).projection = { usb: { forceReset: vi.fn().mockResolvedValue(true) } }
   })
 
-  test('handleFieldChange updates state and persists settings', () => {
+  test('handleFieldChange updates state and persists settings', async () => {
     const initial = { projectionWidth: 800, 'bindings.back': 'KeyB' } as any
     const settings = { projectionWidth: 800, bindings: { back: 'KeyB' } } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
@@ -37,7 +37,7 @@ describe('useSmartSettings', () => {
     expect(result.current.isDirty).toBe(true)
   })
 
-  test('requestRestart ignores bindings paths but marks relevant paths', () => {
+  test('requestRestart ignores bindings paths but marks relevant paths', async () => {
     const initial = { projectionWidth: 800, 'bindings.back': 'KeyB' } as any
     const settings = { projectionWidth: 800 } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
@@ -79,7 +79,7 @@ describe('useSmartSettings', () => {
     expect((window as any).projection.usb.forceReset).not.toHaveBeenCalled()
   })
 
-  test('needsRestartFromConfig detects when settings differ from restartBaseline', () => {
+  test('needsRestartFromConfig detects when settings differ from restartBaseline', async () => {
     // lines 44-53: restartBaseline[key] !== settings[key] for a restart-relevant key
     // The store mock has restartBaseline.projectionWidth = 800, settings.projectionWidth = 900 would differ
     const initial = { projectionWidth: 900 } as any
@@ -89,11 +89,11 @@ describe('useSmartSettings', () => {
     expect(result.current.needsRestart).toBe(true)
   })
 
-  test('handleFieldChange with transform override applies transformation', () => {
+  test('handleFieldChange with transform override applies transformation', async () => {
     // lines 68-69: override?.transform is called
     const initial = { volume: 50 } as any
     const settings = { volume: 50 } as any
-    const transform = jest.fn((v: unknown) => (v as number) * 2)
+    const transform = vi.fn((v: unknown) => (v as number) * 2)
     const { result } = renderHook(() =>
       useSmartSettings(initial, settings, {
         overrides: { volume: { transform } }
@@ -108,11 +108,11 @@ describe('useSmartSettings', () => {
     expect(result.current.state.volume).toBe(20)
   })
 
-  test('handleFieldChange with validate override blocks invalid values', () => {
+  test('handleFieldChange with validate override blocks invalid values', async () => {
     // line 69: override?.validate returning false → no state update
     const initial = { volume: 50 } as any
     const settings = { volume: 50 } as any
-    const validate = jest.fn(() => false) // always reject
+    const validate = vi.fn(() => false) // always reject
     const { result } = renderHook(() =>
       useSmartSettings(initial, settings, {
         overrides: { volume: { validate } }

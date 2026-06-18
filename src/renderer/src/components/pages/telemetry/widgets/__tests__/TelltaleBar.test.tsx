@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { TelltaleBar } from '../TelltaleBar'
 
 // Lit phase, so static lamps show solid and the turn arrows are on this half-cycle.
-jest.mock('../../hooks/useBlink', () => ({ useBlink: () => true }))
+vi.mock('../../hooks/useBlink', () => ({ useBlink: () => true }))
 
 function opacityOf(testId: string): number {
   return Number(screen.getByTestId(testId).style.opacity)

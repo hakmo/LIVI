@@ -1,27 +1,27 @@
 import { render, screen } from '@testing-library/react'
 import { SettingsFieldRow } from '../SettingsFieldRow'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string, fb?: string) => `t:${k}:${fb ?? ''}` })
 }))
 
-jest.mock('../SettingsFieldControl', () => ({
+vi.mock('../SettingsFieldControl', () => ({
   SettingsFieldControl: () => <div data-testid="field-control" />
 }))
-jest.mock('../SettingsFieldPage', () => ({
+vi.mock('../SettingsFieldPage', () => ({
   SettingsFieldPage: () => <div data-testid="field-page" />
 }))
-jest.mock('../btDeviceList/BtDeviceList', () => ({
+vi.mock('../btDeviceList/BtDeviceList', () => ({
   BtDeviceList: () => <div data-testid="bt-list" />
 }))
-jest.mock('../stackItem', () => ({
+vi.mock('../stackItem', () => ({
   StackItem: ({ children, onClick }: any) => (
     <button data-testid="stack-item" onClick={onClick}>
       {children}
     </button>
   )
 }))
-jest.mock('../settingsItemRow', () => ({
+vi.mock('../settingsItemRow', () => ({
   SettingsItemRow: ({ children, label }: any) => (
     <div data-testid="settings-item-row">
       {label}
@@ -37,20 +37,20 @@ describe('SettingsFieldRow', () => {
         node={{ type: 'btDeviceList', path: 'bt', label: 'BT' } as any}
         value={null}
         state={{}}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />
     )
     expect(screen.getByTestId('bt-list')).toBeInTheDocument()
   })
 
   test('renders StackItem when onClick is provided', () => {
-    const onClick = jest.fn()
+    const onClick = vi.fn()
     render(
       <SettingsFieldRow
         node={{ type: 'route', path: 'audio', route: 'audio', label: 'Audio', children: [] } as any}
         value={null}
         state={{}}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
         onClick={onClick}
       />
     )
@@ -64,7 +64,7 @@ describe('SettingsFieldRow', () => {
         node={{ type: 'checkbox', path: 'mute', label: 'Mute' } as any}
         value={false}
         state={{ mute: false }}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />
     )
     expect(screen.getByTestId('settings-item-row')).toBeInTheDocument()

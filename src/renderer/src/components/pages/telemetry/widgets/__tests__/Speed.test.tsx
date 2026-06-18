@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { Speed } from '../Speed'
 
-const segmentDisplayMock = jest.fn()
+const segmentDisplayMock = vi.fn()
 
-jest.mock('../../components/SegmentDisplay', () => ({
+vi.mock('../../components/SegmentDisplay', () => ({
   SegmentDisplay: (props: unknown) => {
     segmentDisplayMock(props)
     return <div data-testid="segment-display" />

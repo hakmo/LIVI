@@ -2,18 +2,18 @@ import { act, renderHook } from '@testing-library/react'
 import { useOptimisticPlaying, useOptimisticPlaying_deprecated } from '../../hooks/'
 
 describe('useOptimisticPlaying_deprecated', () => {
-  beforeEach(() => {
-    jest.useFakeTimers()
-    jest.clearAllTimers()
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.clearAllTimers()
+    vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    jest.runOnlyPendingTimers()
-    jest.useRealTimers()
+  afterEach(async () => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
-  it('uses realPlaying when no override is set', () => {
+  it('uses realPlaying when no override is set', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying }) => useOptimisticPlaying_deprecated(realPlaying),
       {
@@ -28,7 +28,7 @@ describe('useOptimisticPlaying_deprecated', () => {
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('uses override until realPlaying matches and then clears it', () => {
+  it('uses override until realPlaying matches and then clears it', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying }) => useOptimisticPlaying_deprecated(realPlaying),
       {
@@ -47,7 +47,7 @@ describe('useOptimisticPlaying_deprecated', () => {
     expect(result.current.uiPlaying).toBe(true)
   })
 
-  it('auto clears override after 1500ms', () => {
+  it('auto clears override after 1500ms', async () => {
     const { result } = renderHook(() => useOptimisticPlaying_deprecated(false))
 
     act(() => {
@@ -57,13 +57,13 @@ describe('useOptimisticPlaying_deprecated', () => {
     expect(result.current.uiPlaying).toBe(true)
 
     act(() => {
-      jest.advanceTimersByTime(1500)
+      vi.advanceTimersByTime(1500)
     })
 
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('clearOverride resets override immediately', () => {
+  it('clearOverride resets override immediately', async () => {
     const { result } = renderHook(() => useOptimisticPlaying_deprecated(false))
 
     act(() => {
@@ -81,18 +81,18 @@ describe('useOptimisticPlaying_deprecated', () => {
 })
 
 describe('useOptimisticPlaying', () => {
-  beforeEach(() => {
-    jest.useFakeTimers()
-    jest.clearAllTimers()
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.clearAllTimers()
+    vi.clearAllMocks()
   })
 
-  afterEach(() => {
-    jest.runOnlyPendingTimers()
-    jest.useRealTimers()
+  afterEach(async () => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
-  it('returns realPlaying when no override is set', () => {
+  it('returns realPlaying when no override is set', async () => {
     const { result, rerender } = renderHook(({ playing }) => useOptimisticPlaying(playing, null), {
       initialProps: { playing: true }
     })
@@ -103,7 +103,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('uses override when set manually', () => {
+  it('uses override when set manually', async () => {
     const { result } = renderHook(() => useOptimisticPlaying(false, null))
 
     act(() => {
@@ -114,7 +114,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current._internal.manualRef.current).toBe(true)
   })
 
-  it('clears override manually when clearOverride is called', () => {
+  it('clears override manually when clearOverride is called', async () => {
     const { result } = renderHook(() => useOptimisticPlaying(true, null))
 
     act(() => {
@@ -130,7 +130,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current._internal.manualRef.current).toBe(false)
   })
 
-  it('resets override early if realPlaying matches it', () => {
+  it('resets override early if realPlaying matches it', async () => {
     const { result, rerender } = renderHook(({ playing }) => useOptimisticPlaying(playing, null), {
       initialProps: { playing: false }
     })
@@ -173,7 +173,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('uses realPlaying when override is null', () => {
+  it('uses realPlaying when override is null', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying, mediaPayloadError }) => useOptimisticPlaying(realPlaying, mediaPayloadError),
       {
@@ -191,7 +191,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('auto-clears override after timeout when no error', () => {
+  it('auto-clears override after timeout when no error', async () => {
     const { result } = renderHook(() => useOptimisticPlaying(false, null, { timeoutMs: 1500 }))
 
     act(() => {
@@ -200,14 +200,14 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(true)
 
     act(() => {
-      jest.advanceTimersByTime(1600)
+      vi.advanceTimersByTime(1600)
     })
 
     expect(result.current.uiPlaying).toBe(false)
     expect(result.current._internal.manualRef.current).toBe(false)
   })
 
-  it('does not auto-clear override during mediaPayloadError', () => {
+  it('does not auto-clear override during mediaPayloadError', async () => {
     const { result } = renderHook(() =>
       useOptimisticPlaying(false, new Error('bad payload'), { timeoutMs: 1500 })
     )
@@ -218,14 +218,14 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(true)
 
     act(() => {
-      jest.advanceTimersByTime(2000)
+      vi.advanceTimersByTime(2000)
     })
 
     expect(result.current.uiPlaying).toBe(true)
     expect(result.current._internal.manualRef.current).toBe(true)
   })
 
-  it('does not start timeout when mediaPayloadError exists', () => {
+  it('does not start timeout when mediaPayloadError exists', async () => {
     const { result } = renderHook(() =>
       useOptimisticPlaying(false, new Error('payload failed'), { timeoutMs: 500 })
     )
@@ -235,14 +235,14 @@ describe('useOptimisticPlaying', () => {
     })
 
     act(() => {
-      jest.advanceTimersByTime(500)
+      vi.advanceTimersByTime(500)
     })
 
     expect(result.current.uiPlaying).toBe(true)
     expect(result.current._internal.manualRef.current).toBe(true)
   })
 
-  it('keeps manual override when error exists and realPlaying changes', () => {
+  it('keeps manual override when error exists and realPlaying changes', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying, mediaPayloadError }) => useOptimisticPlaying(realPlaying, mediaPayloadError),
       {
@@ -266,7 +266,7 @@ describe('useOptimisticPlaying', () => {
     expect(result.current._internal.manualRef.current).toBe(true)
   })
 
-  it('clears stale override when manualRef is false and override is still set', () => {
+  it('clears stale override when manualRef is false and override is still set', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying, mediaPayloadError }) => useOptimisticPlaying(realPlaying, mediaPayloadError),
       {
@@ -294,14 +294,14 @@ describe('useOptimisticPlaying', () => {
     expect(result.current._internal.manualRef.current).toBe(false)
   })
 
-  it('uses false when both override and realPlaying are falsy', () => {
+  it('uses false when both override and realPlaying are falsy', async () => {
     const { result } = renderHook(() => useOptimisticPlaying(undefined, null))
 
     expect(result.current.uiPlaying).toBe(false)
   })
 
-  it('clears timers on unmount', () => {
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+  it('clears timers on unmount', async () => {
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
     const { result, unmount } = renderHook(() =>
       useOptimisticPlaying(false, null, { timeoutMs: 1500 })
     )
@@ -316,8 +316,8 @@ describe('useOptimisticPlaying', () => {
     clearSpy.mockRestore()
   })
 
-  it('deprecated clears existing timer when realPlaying matches override', () => {
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+  it('deprecated clears existing timer when realPlaying matches override', async () => {
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
 
     const { result, rerender } = renderHook(
       ({ realPlaying }) => useOptimisticPlaying_deprecated(realPlaying),
@@ -340,8 +340,8 @@ describe('useOptimisticPlaying', () => {
     expect(result.current.uiPlaying).toBe(true)
   })
 
-  it('deprecated cleanup clears timer when override effect is replaced', () => {
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+  it('deprecated cleanup clears timer when override effect is replaced', async () => {
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
 
     const { result } = renderHook(() => useOptimisticPlaying_deprecated(false))
 
@@ -391,11 +391,11 @@ describe('useOptimisticPlaying', () => {
     expect(result.current._internal.manualRef.current).toBe(false)
   })
 
-  it('deprecated match effect clears a truthy running timer before resetting override', () => {
-    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
+  it('deprecated match effect clears a truthy running timer before resetting override', async () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
       return 123 as any
     })
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
 
     const { result, rerender } = renderHook(
       ({ realPlaying }: { realPlaying: boolean | undefined }) =>
@@ -417,11 +417,11 @@ describe('useOptimisticPlaying', () => {
     expect(clearSpy).toHaveBeenCalledWith(123)
   })
 
-  it('deprecated override-effect cleanup clears a truthy timer on unmount', () => {
-    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
+  it('deprecated override-effect cleanup clears a truthy timer on unmount', async () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
       return 456 as any
     })
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
 
     const { result, unmount } = renderHook(() => useOptimisticPlaying_deprecated(false))
 
@@ -435,7 +435,7 @@ describe('useOptimisticPlaying', () => {
     expect(clearSpy).toHaveBeenCalledWith(456)
   })
 
-  it('clears stale override in effect when manualRef is false but override is still set', () => {
+  it('clears stale override in effect when manualRef is false but override is still set', async () => {
     const { result, rerender } = renderHook(
       ({ realPlaying, mediaPayloadError }) => useOptimisticPlaying(realPlaying, mediaPayloadError),
       {

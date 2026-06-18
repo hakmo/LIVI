@@ -1,9 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { useBelowNavTop } from '../../hooks'
 
 describe('useBelowNavTop', () => {
-  let mockDisconnect: jest.Mock
-  let mockObserve: jest.Mock
+  let mockDisconnect: Mock
+  let mockObserve: Mock
   let resizeObserverCallback: (() => void) | undefined
   let originalResizeObserver: typeof ResizeObserver
   let originalAddEventListener: typeof window.addEventListener
@@ -12,15 +13,15 @@ describe('useBelowNavTop', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
 
-    mockDisconnect = jest.fn()
-    mockObserve = jest.fn()
+    mockDisconnect = vi.fn()
+    mockObserve = vi.fn()
     resizeObserverCallback = undefined
 
     originalResizeObserver = global.ResizeObserver
     originalAddEventListener = window.addEventListener
     originalRemoveEventListener = window.removeEventListener
 
-    global.ResizeObserver = jest.fn().mockImplementation((cb: () => void) => {
+    global.ResizeObserver = vi.fn().mockImplementation(function (cb: () => void) {
       resizeObserverCallback = cb
       return {
         observe: mockObserve,
@@ -28,8 +29,8 @@ describe('useBelowNavTop', () => {
       }
     }) as unknown as typeof ResizeObserver
 
-    window.addEventListener = jest.fn()
-    window.removeEventListener = jest.fn()
+    window.addEventListener = vi.fn()
+    window.removeEventListener = vi.fn()
   })
 
   afterEach(() => {
@@ -37,13 +38,13 @@ describe('useBelowNavTop', () => {
     global.ResizeObserver = originalResizeObserver
     window.addEventListener = originalAddEventListener
     window.removeEventListener = originalRemoveEventListener
-    jest.restoreAllMocks()
+    vi.restoreAllMocks()
   })
 
   const appendNav = (bottom = 42) => {
     const mockNav = document.createElement('div')
     mockNav.className = 'MuiTabs-root'
-    mockNav.getBoundingClientRect = jest.fn(() => ({ bottom })) as never
+    mockNav.getBoundingClientRect = vi.fn(() => ({ bottom })) as never
     document.body.appendChild(mockNav)
     return mockNav
   }
@@ -62,7 +63,7 @@ describe('useBelowNavTop', () => {
     const mockNav = appendNav(42)
     const { result } = renderHook(() => useBelowNavTop())
 
-    ;(mockNav.getBoundingClientRect as jest.Mock).mockReturnValue({ bottom: 99 })
+    ;(mockNav.getBoundingClientRect as Mock).mockReturnValue({ bottom: 99 })
 
     act(() => {
       resizeObserverCallback?.()
@@ -75,9 +76,9 @@ describe('useBelowNavTop', () => {
     const mockNav = appendNav(42)
     const { result } = renderHook(() => useBelowNavTop())
 
-    ;(mockNav.getBoundingClientRect as jest.Mock).mockReturnValue({ bottom: 77 })
+    ;(mockNav.getBoundingClientRect as Mock).mockReturnValue({ bottom: 77 })
 
-    const resizeHandler = (window.addEventListener as jest.Mock).mock.calls.find(
+    const resizeHandler = (window.addEventListener as Mock).mock.calls.find(
       ([event]) => event === 'resize'
     )?.[1] as (() => void) | undefined
 

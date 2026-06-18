@@ -6,7 +6,7 @@ import { OilTemp } from '../OilTemp'
 import { Rpm } from '../Rpm'
 import { Speed } from '../Speed'
 
-jest.mock('../../components/SegmentDisplay', () => ({
+vi.mock('../../components/SegmentDisplay', () => ({
   SegmentDisplay: ({ value, digits }: { value: string; digits: number }) => (
     <div data-testid="segment-display">
       {value}|{digits}
@@ -14,7 +14,7 @@ jest.mock('../../components/SegmentDisplay', () => ({
   )
 }))
 
-jest.mock('../../components/MetricRow', () => ({
+vi.mock('../../components/MetricRow', () => ({
   MetricRow: (props: unknown) => <div data-testid="metric-row">{JSON.stringify(props)}</div>
 }))
 

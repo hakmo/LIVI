@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { useElementSize } from '../../hooks/useElementSize'
 
 describe('useElementSize', () => {
@@ -6,17 +7,17 @@ describe('useElementSize', () => {
     | ((entries: Array<{ contentRect?: { width: number; height: number } }>) => void)
     | undefined
 
-  let observeMock: jest.Mock
-  let disconnectMock: jest.Mock
-  let requestAnimationFrameMock: jest.Mock
-  let cancelAnimationFrameMock: jest.Mock
+  let observeMock: Mock
+  let disconnectMock: Mock
+  let requestAnimationFrameMock: Mock
+  let cancelAnimationFrameMock: Mock
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     resizeObserverCallback = undefined
 
-    observeMock = jest.fn()
-    disconnectMock = jest.fn()
+    observeMock = vi.fn()
+    disconnectMock = vi.fn()
 
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
@@ -28,12 +29,12 @@ describe('useElementSize', () => {
       value: 720
     })
 
-    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+    requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       cb(0)
       return 1
     })
 
-    cancelAnimationFrameMock = jest.fn()
+    cancelAnimationFrameMock = vi.fn()
     ;(global as any).requestAnimationFrame = requestAnimationFrameMock
     ;(global as any).cancelAnimationFrame = cancelAnimationFrameMock
     ;(global as any).ResizeObserver = class {
@@ -114,7 +115,7 @@ describe('useElementSize', () => {
   })
 
   test('cancels scheduled animation frame on unmount when one is pending', () => {
-    requestAnimationFrameMock = jest.fn(() => 42)
+    requestAnimationFrameMock = vi.fn(() => 42)
     ;(global as any).requestAnimationFrame = requestAnimationFrameMock
 
     const { unmount } = render(<TestComponent />)
@@ -149,7 +150,7 @@ describe('useElementSize', () => {
   test('schedules only one animation frame while multiple resize events arrive before flush', () => {
     let queuedFrame: FrameRequestCallback | undefined
 
-    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+    requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       queuedFrame = cb
       return 7
     })
@@ -176,7 +177,7 @@ describe('useElementSize', () => {
   test('flush returns early when no pending size exists', () => {
     let queuedFrame: FrameRequestCallback | undefined
 
-    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+    requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       queuedFrame = cb
       return 9
     })
@@ -206,7 +207,7 @@ describe('useElementSize', () => {
   test('keeps previous state when flushed size matches current size exactly', () => {
     let queuedFrame: FrameRequestCallback | undefined
 
-    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+    requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       queuedFrame = cb
       return 11
     })

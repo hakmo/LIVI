@@ -1,19 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { DashboardsPagination } from '../pagination'
 
-const usePaginationDotsMock = jest.fn()
+const usePaginationDotsMock = vi.fn()
 
-jest.mock('@renderer/components/pages/telemetry/hooks/usePaginationDots', () => ({
+vi.mock('@renderer/components/pages/telemetry/hooks/usePaginationDots', () => ({
   usePaginationDots: (isNavbarHidden: boolean) => usePaginationDotsMock(isNavbarHidden)
 }))
 
 describe('DashboardsPagination', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     usePaginationDotsMock.mockReturnValue({
       showDots: true,
-      revealDots: jest.fn()
+      revealDots: vi.fn()
     })
   })
 
@@ -22,7 +22,7 @@ describe('DashboardsPagination', () => {
       <DashboardsPagination
         activeIndex={1}
         dotsLength={4}
-        onSetIndex={jest.fn()}
+        onSetIndex={vi.fn()}
         isNavbarHidden={false}
       />
     )
@@ -35,7 +35,7 @@ describe('DashboardsPagination', () => {
       <DashboardsPagination
         activeIndex={0}
         dotsLength={2}
-        onSetIndex={jest.fn()}
+        onSetIndex={vi.fn()}
         isNavbarHidden={true}
       />
     )
@@ -44,8 +44,8 @@ describe('DashboardsPagination', () => {
   })
 
   test('calls onSetIndex and revealDots on pointer down', () => {
-    const onSetIndex = jest.fn()
-    const revealDots = jest.fn()
+    const onSetIndex = vi.fn()
+    const revealDots = vi.fn()
 
     usePaginationDotsMock.mockReturnValue({
       showDots: true,
@@ -68,8 +68,8 @@ describe('DashboardsPagination', () => {
   })
 
   test('calls onSetIndex and revealDots on Enter key', () => {
-    const onSetIndex = jest.fn()
-    const revealDots = jest.fn()
+    const onSetIndex = vi.fn()
+    const revealDots = vi.fn()
 
     usePaginationDotsMock.mockReturnValue({
       showDots: true,
@@ -92,8 +92,8 @@ describe('DashboardsPagination', () => {
   })
 
   test('calls onSetIndex and revealDots on Space key', () => {
-    const onSetIndex = jest.fn()
-    const revealDots = jest.fn()
+    const onSetIndex = vi.fn()
+    const revealDots = vi.fn()
 
     usePaginationDotsMock.mockReturnValue({
       showDots: true,
@@ -116,8 +116,8 @@ describe('DashboardsPagination', () => {
   })
 
   test('does not react to other keys', () => {
-    const onSetIndex = jest.fn()
-    const revealDots = jest.fn()
+    const onSetIndex = vi.fn()
+    const revealDots = vi.fn()
 
     usePaginationDotsMock.mockReturnValue({
       showDots: true,
@@ -142,14 +142,14 @@ describe('DashboardsPagination', () => {
   test('hides pagination visually when showDots is false', () => {
     usePaginationDotsMock.mockReturnValue({
       showDots: false,
-      revealDots: jest.fn()
+      revealDots: vi.fn()
     })
 
     const { container } = render(
       <DashboardsPagination
         activeIndex={0}
         dotsLength={2}
-        onSetIndex={jest.fn()}
+        onSetIndex={vi.fn()}
         isNavbarHidden={false}
       />
     )

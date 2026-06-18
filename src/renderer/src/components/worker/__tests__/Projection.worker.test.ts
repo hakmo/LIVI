@@ -1,18 +1,20 @@
+import type { Mock } from 'vitest'
+
 describe('Projection.worker', () => {
   let selfMock: {
     onmessage: ((ev: MessageEvent<any>) => void) | null
-    postMessage: jest.Mock
+    postMessage: Mock
   }
 
   const originalSelf = global.self
   const originalConsoleError = console.error
 
-  beforeEach(() => {
-    jest.resetModules()
+  beforeEach(async () => {
+    vi.resetModules()
 
     selfMock = {
       onmessage: null,
-      postMessage: jest.fn()
+      postMessage: vi.fn()
     }
 
     Object.defineProperty(global, 'self', {
@@ -20,10 +22,10 @@ describe('Projection.worker', () => {
       value: selfMock
     })
 
-    console.error = jest.fn()
+    console.error = vi.fn()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     Object.defineProperty(global, 'self', {
       configurable: true,
       value: originalSelf
@@ -31,16 +33,16 @@ describe('Projection.worker', () => {
     console.error = originalConsoleError
   })
 
-  const loadWorker = () => {
-    require('../Projection.worker')
+  const loadWorker = async () => {
+    await import('../Projection.worker')
   }
 
   test('sets up audio port on initialise and starts it', async () => {
-    loadWorker()
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -55,11 +57,11 @@ describe('Projection.worker', () => {
   })
 
   test('processes Int16Array audio data from port and posts pcmData', async () => {
-    loadWorker()
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -94,11 +96,11 @@ describe('Projection.worker', () => {
   })
 
   test('accepts ArrayBuffer via buffer property', async () => {
-    loadWorker()
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -123,11 +125,11 @@ describe('Projection.worker', () => {
   })
 
   test('accepts ArrayBuffer via chunk property', async () => {
-    loadWorker()
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -152,7 +154,7 @@ describe('Projection.worker', () => {
   })
 
   test('logs error when initialise payload has no audioPort', async () => {
-    loadWorker()
+    await loadWorker()
 
     selfMock.onmessage?.({
       data: {
@@ -166,12 +168,12 @@ describe('Projection.worker', () => {
     )
   })
 
-  test('logs error for unprocessable audio data', () => {
-    loadWorker()
+  test('logs error for unprocessable audio data', async () => {
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -202,10 +204,10 @@ describe('Projection.worker', () => {
   })
 
   test('posts failure when port setup throws', async () => {
-    loadWorker()
+    await loadWorker()
 
     const port = {
-      start: jest.fn(() => {
+      start: vi.fn(() => {
         throw new Error('boom')
       })
     }
@@ -228,7 +230,7 @@ describe('Projection.worker', () => {
   })
 
   test('ignores stop and unknown commands', async () => {
-    loadWorker()
+    await loadWorker()
 
     selfMock.onmessage?.({ data: { type: 'stop' } } as MessageEvent<any>)
     selfMock.onmessage?.({ data: { type: 'whatever' } } as MessageEvent<any>)
@@ -236,12 +238,12 @@ describe('Projection.worker', () => {
     expect(selfMock.postMessage).not.toHaveBeenCalled()
   })
 
-  test('logs error when processing an audio message throws inside port handler', () => {
-    loadWorker()
+  test('logs error when processing an audio message throws inside port handler', async () => {
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -269,12 +271,12 @@ describe('Projection.worker', () => {
     )
   })
 
-  test('logs error when PCM payload is null', () => {
-    loadWorker()
+  test('logs error when PCM payload is null', async () => {
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({
@@ -295,12 +297,12 @@ describe('Projection.worker', () => {
     expect(selfMock.postMessage).not.toHaveBeenCalled()
   })
 
-  test('ignores non-audio messages on the port even when data is present', () => {
-    loadWorker()
+  test('ignores non-audio messages on the port even when data is present', async () => {
+    await loadWorker()
 
     const port = {
       onmessage: null as ((ev: MessageEvent<any>) => void) | null,
-      start: jest.fn()
+      start: vi.fn()
     }
 
     selfMock.onmessage?.({

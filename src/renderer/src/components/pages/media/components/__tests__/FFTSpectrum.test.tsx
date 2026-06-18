@@ -2,8 +2,8 @@ import { createTheme, ThemeProvider } from '@mui/material/styles'
 import { act, render, waitFor } from '@testing-library/react'
 import { FFTSpectrum, normalizePcmBuffer } from '../FFTSpectrum'
 
-const postMessageMock = jest.fn()
-const terminateMock = jest.fn()
+const postMessageMock = vi.fn()
+const terminateMock = vi.fn()
 
 const workerInstance = {
   postMessage: postMessageMock,
@@ -11,7 +11,7 @@ const workerInstance = {
   onmessage: null as ((e: MessageEvent) => void) | null
 }
 
-jest.mock('../createFftWorker', () => ({
+vi.mock('../createFftWorker', () => ({
   createFftWorker: () => workerInstance
 }))
 
@@ -21,29 +21,29 @@ let mockState = {
   audioPcmData: null as Float32Array | null
 }
 
-const subscribeMock = jest.fn<() => void, [(s: typeof mockState) => void]>(
-  (_cb: (s: typeof mockState) => void) => jest.fn()
+const subscribeMock = vi.fn<() => void, [(s: typeof mockState) => void]>(
+  (_cb: (s: typeof mockState) => void) => vi.fn()
 )
-const observeMock = jest.fn()
-const disconnectMock = jest.fn()
-const clearRectMock = jest.fn()
-const fillRectMock = jest.fn()
-const beginPathMock = jest.fn()
-const moveToMock = jest.fn()
-const lineToMock = jest.fn()
-const strokeMock = jest.fn()
-const fillTextMock = jest.fn()
+const observeMock = vi.fn()
+const disconnectMock = vi.fn()
+const clearRectMock = vi.fn()
+const fillRectMock = vi.fn()
+const beginPathMock = vi.fn()
+const moveToMock = vi.fn()
+const lineToMock = vi.fn()
+const strokeMock = vi.fn()
+const fillTextMock = vi.fn()
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: Object.assign((selector: (s: typeof mockState) => unknown) => selector(mockState), {
     subscribe: (cb: (s: typeof mockState) => void) => subscribeMock(cb)
   })
 }))
 
 describe('FFTSpectrum', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-    jest.useFakeTimers()
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
     mockState = {
       audioSampleRate: 48000,
@@ -55,11 +55,11 @@ describe('FFTSpectrum', () => {
     workerInstance.terminate = terminateMock
     workerInstance.onmessage = null
 
-    const requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+    const requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       return setTimeout(() => cb(performance.now() + 100), 0) as unknown as number
     })
 
-    const cancelAnimationFrameMock = jest.fn((id: number) => {
+    const cancelAnimationFrameMock = vi.fn((id: number) => {
       clearTimeout(id as unknown as ReturnType<typeof setTimeout>)
     })
 
@@ -92,7 +92,7 @@ describe('FFTSpectrum', () => {
       configurable: true,
       value: cancelAnimationFrameMock
     })
-    ;(global as any).ResizeObserver = jest.fn((cb: ResizeObserverCallback) => {
+    ;(global as any).ResizeObserver = vi.fn(function (cb: ResizeObserverCallback) {
       return {
         observe: (target: Element) => {
           observeMock(target)
@@ -122,14 +122,14 @@ describe('FFTSpectrum', () => {
 
     Object.defineProperty(window, 'getComputedStyle', {
       configurable: true,
-      value: jest.fn(() => ({
-        getPropertyValue: jest.fn(() => '#12ab34')
+      value: vi.fn(() => ({
+        getPropertyValue: vi.fn(() => '#12ab34')
       }))
     })
 
     Object.defineProperty(HTMLCanvasElement.prototype, 'getBoundingClientRect', {
       configurable: true,
-      value: jest.fn(() => ({
+      value: vi.fn(() => ({
         width: 320,
         height: 180,
         top: 0,
@@ -141,7 +141,7 @@ describe('FFTSpectrum', () => {
 
     Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
       configurable: true,
-      value: jest.fn(() => ({
+      value: vi.fn(() => ({
         clearRect: clearRectMock,
         fillRect: fillRectMock,
         beginPath: beginPathMock,
@@ -159,11 +159,11 @@ describe('FFTSpectrum', () => {
     })
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   test('creates worker and posts init message', async () => {
@@ -181,7 +181,7 @@ describe('FFTSpectrum', () => {
     })
   })
 
-  test('terminates worker and disconnects resize observer on unmount', () => {
+  test('terminates worker and disconnects resize observer on unmount', async () => {
     const { unmount } = render(<FFTSpectrum />)
 
     unmount()
@@ -194,7 +194,7 @@ describe('FFTSpectrum', () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(<FFTSpectrum />)
@@ -205,7 +205,7 @@ describe('FFTSpectrum', () => {
     expect(postMessageMock).toHaveBeenCalledTimes(1)
 
     act(() => {
-      jest.advanceTimersByTime(120)
+      vi.advanceTimersByTime(120)
     })
 
     await waitFor(() => {
@@ -225,7 +225,7 @@ describe('FFTSpectrum', () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(<FFTSpectrum />)
@@ -243,11 +243,11 @@ describe('FFTSpectrum', () => {
     })
   })
 
-  test('ignores empty pcm payloads', () => {
+  test('ignores empty pcm payloads', async () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(<FFTSpectrum />)
@@ -257,11 +257,11 @@ describe('FFTSpectrum', () => {
     expect(postMessageMock).toHaveBeenCalledTimes(1)
   })
 
-  test('ignores null pcm payloads', () => {
+  test('ignores null pcm payloads', async () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(<FFTSpectrum />)
@@ -279,7 +279,7 @@ describe('FFTSpectrum', () => {
     } as MessageEvent)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     await waitFor(() => {
@@ -295,7 +295,7 @@ describe('FFTSpectrum', () => {
     })
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     await waitFor(() => {
@@ -315,15 +315,15 @@ describe('FFTSpectrum', () => {
   test('uses theme fallback when css variable is empty', async () => {
     Object.defineProperty(window, 'getComputedStyle', {
       configurable: true,
-      value: jest.fn(() => ({
-        getPropertyValue: jest.fn(() => '')
+      value: vi.fn(() => ({
+        getPropertyValue: vi.fn(() => '')
       }))
     })
 
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     await waitFor(() => {
@@ -331,11 +331,11 @@ describe('FFTSpectrum', () => {
     })
   })
 
-  test('ignores worker messages with unknown type', () => {
+  test('ignores worker messages with unknown type', async () => {
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     const callsBefore = fillRectMock.mock.calls.length
@@ -345,16 +345,16 @@ describe('FFTSpectrum', () => {
     } as MessageEvent)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(fillRectMock.mock.calls.length).toBeGreaterThanOrEqual(callsBefore)
   })
 
-  test('skips background draw when width is zero', () => {
+  test('skips background draw when width is zero', async () => {
     Object.defineProperty(HTMLCanvasElement.prototype, 'getBoundingClientRect', {
       configurable: true,
-      value: jest.fn(() => ({
+      value: vi.fn(() => ({
         width: 0,
         height: 150,
         top: 0,
@@ -367,15 +367,15 @@ describe('FFTSpectrum', () => {
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(fillTextMock).not.toHaveBeenCalled()
     expect(strokeMock).not.toHaveBeenCalled()
   })
 
-  test('skips draw frame when FPS threshold not reached', () => {
-    const nowMock = jest.spyOn(performance, 'now')
+  test('skips draw frame when FPS threshold not reached', async () => {
+    const nowMock = vi.spyOn(performance, 'now')
 
     let t = 0
     nowMock.mockImplementation(() => t)
@@ -383,7 +383,7 @@ describe('FFTSpectrum', () => {
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     const callsAfterFirstFrame = fillRectMock.mock.calls.length
@@ -391,7 +391,7 @@ describe('FFTSpectrum', () => {
     t = 1
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(fillRectMock.mock.calls.length).toBe(callsAfterFirstFrame)
@@ -402,15 +402,15 @@ describe('FFTSpectrum', () => {
   test('uses css variable for barColor when present', async () => {
     Object.defineProperty(window, 'getComputedStyle', {
       configurable: true,
-      value: jest.fn(() => ({
-        getPropertyValue: jest.fn(() => '  #ff0000  ')
+      value: vi.fn(() => ({
+        getPropertyValue: vi.fn(() => '  #ff0000  ')
       }))
     })
 
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     await waitFor(() => {
@@ -418,7 +418,7 @@ describe('FFTSpectrum', () => {
     })
   })
 
-  test('does not update bins when worker sends non-bins message', () => {
+  test('does not update bins when worker sends non-bins message', async () => {
     render(<FFTSpectrum />)
 
     const prev = new Float32Array(24).fill(0.25)
@@ -428,7 +428,7 @@ describe('FFTSpectrum', () => {
     } as MessageEvent)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     const callsBefore = fillRectMock.mock.calls.length
@@ -438,17 +438,17 @@ describe('FFTSpectrum', () => {
     } as MessageEvent)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(fillRectMock.mock.calls.length).toBeGreaterThanOrEqual(callsBefore)
   })
 
-  test('skips draw when canvas is null after unmount', () => {
+  test('skips draw when canvas is null after unmount', async () => {
     const { unmount } = render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     const callsBeforeUnmount = fillRectMock.mock.calls.length
@@ -456,19 +456,19 @@ describe('FFTSpectrum', () => {
     unmount()
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(fillRectMock.mock.calls.length).toBe(callsBeforeUnmount)
   })
 
-  test('updates canvas size when dimensions change', () => {
+  test('updates canvas size when dimensions change', async () => {
     render(<FFTSpectrum />)
 
     const canvas = document.querySelectorAll('canvas')[1] as HTMLCanvasElement
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     expect(canvas.width).toBe(300)
@@ -478,15 +478,15 @@ describe('FFTSpectrum', () => {
   test('uses css variable when present for barColor', async () => {
     Object.defineProperty(window, 'getComputedStyle', {
       configurable: true,
-      value: jest.fn(() => ({
-        getPropertyValue: jest.fn(() => ' #00ff00 ')
+      value: vi.fn(() => ({
+        getPropertyValue: vi.fn(() => ' #00ff00 ')
       }))
     })
 
     render(<FFTSpectrum />)
 
     act(() => {
-      jest.runOnlyPendingTimers()
+      vi.runOnlyPendingTimers()
     })
 
     await waitFor(() => {
@@ -504,7 +504,7 @@ describe('FFTSpectrum', () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(
@@ -530,7 +530,7 @@ describe('FFTSpectrum', () => {
     })
 
     act(() => {
-      jest.advanceTimersByTime(120)
+      vi.advanceTimersByTime(120)
     })
 
     await waitFor(() => {
@@ -544,7 +544,7 @@ describe('FFTSpectrum', () => {
     let subscriber!: (s: typeof mockState) => void
     subscribeMock.mockImplementation((cb) => {
       subscriber = cb
-      return jest.fn()
+      return vi.fn()
     })
 
     render(<FFTSpectrum />)
@@ -566,8 +566,8 @@ describe('FFTSpectrum', () => {
     expect(postMessageMock.mock.calls[1][1]).toHaveLength(1)
   })
 
-  test('does nothing when resize observer callback is never triggered', () => {
-    ;(global as any).ResizeObserver = jest.fn(() => {
+  test('does nothing when resize observer callback is never triggered', async () => {
+    ;(global as any).ResizeObserver = vi.fn(function () {
       return {
         observe: observeMock,
         disconnect: disconnectMock
@@ -582,7 +582,7 @@ describe('FFTSpectrum', () => {
     expect(fillTextMock).not.toHaveBeenCalled()
   })
 
-  test('normalizePcmBuffer clones Float32Array input', () => {
+  test('normalizePcmBuffer clones Float32Array input', async () => {
     const pcm = new Float32Array([0.1, 0.2, 0.3])
 
     const result = normalizePcmBuffer(pcm)
@@ -595,7 +595,7 @@ describe('FFTSpectrum', () => {
     expect(result[2]).toBeCloseTo(0.3)
   })
 
-  test('normalizePcmBuffer converts array-like pcm input', () => {
+  test('normalizePcmBuffer converts array-like pcm input', async () => {
     const result = normalizePcmBuffer([0.1, 0.2, 0.3])
 
     expect(result).toBeInstanceOf(Float32Array)

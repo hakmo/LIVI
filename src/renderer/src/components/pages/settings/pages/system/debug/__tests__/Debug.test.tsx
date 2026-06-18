@@ -4,16 +4,16 @@ import { Debug } from '../Debug'
 let onEventCb: ((e: unknown, ...args: unknown[]) => void) | undefined
 
 describe('Debug page', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     onEventCb = undefined
     ;(window as any).projection = {
       ipc: {
-        readNavigation: jest.fn().mockResolvedValue({ route: 'Main St' }),
-        readMedia: jest.fn().mockResolvedValue({ artist: 'Artist' }),
-        onEvent: jest.fn((cb: any) => {
+        readNavigation: vi.fn().mockResolvedValue({ route: 'Main St' }),
+        readMedia: vi.fn().mockResolvedValue({ artist: 'Artist' }),
+        onEvent: vi.fn((cb: any) => {
           onEventCb = cb
         }),
-        offEvent: jest.fn()
+        offEvent: vi.fn()
       }
     }
   })
@@ -89,7 +89,7 @@ describe('Debug page', () => {
   })
 
   test('readNavigation failure does not crash', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockRejectedValue(new Error('net'))
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockRejectedValue(new Error('net'))
     render(<Debug />)
     // Should render without error even if readNavigation rejects
     await waitFor(() => expect((window as any).projection.ipc.readNavigation).toHaveBeenCalled())
@@ -97,7 +97,7 @@ describe('Debug page', () => {
   })
 
   test('readMedia failure does not crash', async () => {
-    ;(window as any).projection.ipc.readMedia = jest.fn().mockRejectedValue(new Error('net'))
+    ;(window as any).projection.ipc.readMedia = vi.fn().mockRejectedValue(new Error('net'))
     render(<Debug />)
     await waitFor(() => expect((window as any).projection.ipc.readMedia).toHaveBeenCalled())
     expect(screen.getByText(/mediaData\.json/i)).toBeInTheDocument()
@@ -116,7 +116,7 @@ describe('Debug page', () => {
   })
 
   test('navigation snapshot auto-update toggle re-fetches on enable', async () => {
-    const readNav = jest.fn().mockResolvedValue({ test: true })
+    const readNav = vi.fn().mockResolvedValue({ test: true })
     ;(window as any).projection.ipc.readNavigation = readNav
     render(<Debug />)
     await waitFor(() => expect(readNav).toHaveBeenCalledTimes(1))

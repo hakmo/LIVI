@@ -4,28 +4,28 @@ import { SoftwareUpdate } from '../SoftwareUpdate'
 let updateEventCb: ((e: any) => void) | undefined
 let progressCb: ((p: any) => void) | undefined
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k })
 }))
 
 describe('SoftwareUpdate', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     updateEventCb = undefined
     progressCb = undefined
     ;(window as any).app = {
-      getVersion: jest.fn().mockResolvedValue('1.0.0'),
-      getLatestRelease: jest.fn().mockResolvedValue({ version: '1.1.0', url: 'https://u' }),
-      performUpdate: jest.fn(),
-      onUpdateEvent: jest.fn((cb: any) => {
+      getVersion: vi.fn().mockResolvedValue('1.0.0'),
+      getLatestRelease: vi.fn().mockResolvedValue({ version: '1.1.0', url: 'https://u' }),
+      performUpdate: vi.fn(),
+      onUpdateEvent: vi.fn((cb: any) => {
         updateEventCb = cb
         return () => {}
       }),
-      onUpdateProgress: jest.fn((cb: any) => {
+      onUpdateProgress: vi.fn((cb: any) => {
         progressCb = cb
         return () => {}
       }),
-      abortUpdate: jest.fn(),
-      beginInstall: jest.fn()
+      abortUpdate: vi.fn(),
+      beginInstall: vi.fn()
     }
   })
 
@@ -80,7 +80,7 @@ describe('SoftwareUpdate', () => {
 
   test('aborted error phase auto-closes dialog after 1200ms', async () => {
     // lines 87-92: phase=error + /aborted/ → setTimeout(handleCloseAndReset, 1200)
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     render(<SoftwareUpdate />)
 
     act(() => {
@@ -95,18 +95,18 @@ describe('SoftwareUpdate', () => {
 
     // not yet closed
     act(() => {
-      jest.advanceTimersByTime(1199)
+      vi.advanceTimersByTime(1199)
     })
     // still visible
     expect(screen.getByText('softwareUpdate.close')).toBeInTheDocument()
 
     act(() => {
-      jest.advanceTimersByTime(2)
+      vi.advanceTimersByTime(2)
     })
     // auto-closed
     expect(screen.queryByText('softwareUpdate.close')).not.toBeInTheDocument()
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   test('handlePrimaryAction when inFlight opens the dialog', async () => {
@@ -132,7 +132,7 @@ describe('SoftwareUpdate', () => {
 
   test('getLatestRelease failure shows error message', async () => {
     // lines 70-73: catch → setLatestVersion(''), setMessage(t(...couldNotCheck...))
-    ;(window as any).app.getLatestRelease = jest.fn().mockRejectedValue(new Error('network fail'))
+    ;(window as any).app.getLatestRelease = vi.fn().mockRejectedValue(new Error('network fail'))
     render(<SoftwareUpdate />)
 
     await waitFor(() => {
@@ -142,9 +142,7 @@ describe('SoftwareUpdate', () => {
 
   test('getLatestRelease returning no version shows message', async () => {
     // line 66: r.version falsy → setMessage(t(...couldNotCheck...))
-    ;(window as any).app.getLatestRelease = jest
-      .fn()
-      .mockResolvedValue({ version: null, url: null })
+    ;(window as any).app.getLatestRelease = vi.fn().mockResolvedValue({ version: null, url: null })
     render(<SoftwareUpdate />)
 
     await waitFor(() => {

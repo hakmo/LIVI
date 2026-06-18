@@ -4,28 +4,28 @@ import { ROUTES } from '../../../constants'
 import { AppContext, AppContextProps } from '../../../context'
 import { useKeyDown } from '../useKeyDown'
 
-const mockBroadcastMediaKey = jest.fn()
+const mockBroadcastMediaKey = vi.fn()
 
 let mockPathname: string = ROUTES.HOME
 let mockHash = ''
 let mockSettings: any = null
 
-jest.mock('../../../utils/broadcastMediaKey', () => ({
+vi.mock('../../../utils/broadcastMediaKey', () => ({
   broadcastMediaKey: (...args: unknown[]) => mockBroadcastMediaKey(...args)
 }))
 
-jest.mock('react-router', () => ({
+vi.mock('react-router', () => ({
   useLocation: () => ({ pathname: mockPathname, hash: mockHash })
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: { settings: unknown }) => unknown) =>
     selector({ settings: mockSettings })
 }))
 
 const makeEvent = (code: string) => {
-  const preventDefault = jest.fn()
-  const stopPropagation = jest.fn()
+  const preventDefault = vi.fn()
+  const stopPropagation = vi.fn()
 
   return {
     code,
@@ -50,8 +50,8 @@ const setupRoots = () => {
 
 describe('useKeyDown', () => {
   beforeEach(() => {
-    jest.useRealTimers()
-    jest.clearAllMocks()
+    vi.useRealTimers()
+    vi.clearAllMocks()
     mockPathname = ROUTES.HOME
     mockHash = ''
     mockSettings = null
@@ -59,7 +59,7 @@ describe('useKeyDown', () => {
   })
 
   test('sends mapped commands in CarPlay mode and auto-emits selectUp', () => {
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const { navRoot, contentRoot } = setupRoots()
     const mainBtn = document.createElement('button')
     contentRoot.appendChild(mainBtn)
@@ -71,15 +71,15 @@ describe('useKeyDown', () => {
       }
     }
 
-    const onSetKeyCommand = jest.fn()
-    const onSetCommandCounter = jest.fn()
+    const onSetKeyCommand = vi.fn()
+    const onSetCommandCounter = vi.fn()
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       navEl: { current: navRoot },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -91,11 +91,11 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: true,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => true),
-          focusFirstInMain: jest.fn(() => true),
-          moveFocusLinear: jest.fn(() => true),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => true),
+          focusSelectedNav: vi.fn(() => true),
+          focusFirstInMain: vi.fn(() => true),
+          moveFocusLinear: vi.fn(() => true),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => true),
           onSetKeyCommand,
           onSetCommandCounter
         }),
@@ -109,7 +109,7 @@ describe('useKeyDown', () => {
     expect(onSetCommandCounter).toHaveBeenCalled()
     expect(mockBroadcastMediaKey).toHaveBeenCalledWith('selectDown')
 
-    jest.advanceTimersByTime(220)
+    vi.advanceTimersByTime(220)
 
     expect(onSetKeyCommand).toHaveBeenCalledWith('selectUp')
     expect(mockBroadcastMediaKey).toHaveBeenCalledWith('selectUp')
@@ -122,17 +122,17 @@ describe('useKeyDown', () => {
     mockPathname = ROUTES.TELEMETRY
 
     const pager = {
-      prev: jest.fn(),
-      next: jest.fn(),
-      canPrev: jest.fn(() => true),
-      canNext: jest.fn(() => true)
+      prev: vi.fn(),
+      next: vi.fn(),
+      canPrev: vi.fn(() => true),
+      canNext: vi.fn(() => true)
     }
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       telemetryPager: pager,
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -144,13 +144,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: () => false,
-          focusSelectedNav: jest.fn(() => true),
-          focusFirstInMain: jest.fn(() => true),
-          moveFocusLinear: jest.fn(() => true),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => true),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusSelectedNav: vi.fn(() => true),
+          focusFirstInMain: vi.fn(() => true),
+          moveFocusLinear: vi.fn(() => true),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => true),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -178,35 +178,35 @@ describe('useKeyDown', () => {
     navRoot.appendChild(navBtn)
     navBtn.focus()
 
-    const dispatchSpy = jest.spyOn(navBtn, 'dispatchEvent')
-    const clickSpy = jest.spyOn(navBtn, 'click')
-    const activateControl = jest.fn(() => false)
+    const dispatchSpy = vi.spyOn(navBtn, 'dispatchEvent')
+    const clickSpy = vi.spyOn(navBtn, 'click')
+    const activateControl = vi.fn(() => false)
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       navEl: { current: navRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
     )
 
-    const focusFirstInMain = jest.fn(() => true)
+    const focusFirstInMain = vi.fn(() => true)
 
     const { result } = renderHook(
       () =>
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => true),
+          focusSelectedNav: vi.fn(() => true),
           focusFirstInMain,
-          moveFocusLinear: jest.fn(() => true),
-          isFormField: jest.fn(() => false),
+          moveFocusLinear: vi.fn(() => true),
+          isFormField: vi.fn(() => false),
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -235,13 +235,13 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(listbox)
     option.focus()
 
-    const dispatchSpy = jest.spyOn(option, 'dispatchEvent')
+    const dispatchSpy = vi.spyOn(option, 'dispatchEvent')
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
 
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -253,13 +253,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => true),
-          focusFirstInMain: jest.fn(() => true),
-          moveFocusLinear: jest.fn(() => true),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusSelectedNav: vi.fn(() => true),
+          focusFirstInMain: vi.fn(() => true),
+          moveFocusLinear: vi.fn(() => true),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -272,16 +272,16 @@ describe('useKeyDown', () => {
     const { contentRoot } = setupRoots()
 
     mockPathname = '/settings/system'
-    const backSpy = jest.spyOn(window.history, 'back').mockImplementation(() => undefined)
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => undefined)
 
     const input = document.createElement('input')
     input.type = 'number'
     contentRoot.appendChild(input)
     input.focus()
 
-    const onSetAppContext = jest.fn()
-    const activateControl = jest.fn(() => true)
-    const moveFocusLinear = jest.fn(() => true)
+    const onSetAppContext = vi.fn()
+    const activateControl = vi.fn(() => true)
+    const moveFocusLinear = vi.fn(() => true)
 
     const context: AppContextProps = {
       isTouchDevice: false,
@@ -299,13 +299,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => true),
-          focusFirstInMain: jest.fn(() => true),
+          focusSelectedNav: vi.fn(() => true),
+          focusFirstInMain: vi.fn(() => true),
           moveFocusLinear,
           isFormField: (el) => !!el && el.tagName === 'INPUT',
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -334,8 +334,8 @@ describe('useKeyDown', () => {
       }
     }
 
-    const onSetKeyCommand = jest.fn()
-    const onSetCommandCounter = jest.fn()
+    const onSetKeyCommand = vi.fn()
+    const onSetCommandCounter = vi.fn()
 
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={{ isTouchDevice: false }}>{children}</AppContext.Provider>
@@ -346,11 +346,11 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: () => false,
-          focusSelectedNav: jest.fn(() => true),
-          focusFirstInMain: jest.fn(() => true),
-          moveFocusLinear: jest.fn(() => true),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => true),
+          focusFirstInMain: vi.fn(() => true),
+          moveFocusLinear: vi.fn(() => true),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
           onSetKeyCommand,
           onSetCommandCounter
         }),
@@ -366,7 +366,7 @@ describe('useKeyDown', () => {
 
   test('focuses nav when nothing is focused and arrow key is pressed', () => {
     setupRoots()
-    const focusSelectedNav = jest.fn(() => true)
+    const focusSelectedNav = vi.fn(() => true)
 
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={{ isTouchDevice: false }}>{children}</AppContext.Provider>
@@ -378,12 +378,12 @@ describe('useKeyDown', () => {
           receivingVideo: false,
           inContainer: () => false,
           focusSelectedNav,
-          focusFirstInMain: jest.fn(() => true),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusFirstInMain: vi.fn(() => true),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -401,7 +401,7 @@ describe('useKeyDown', () => {
     mockPathname = ''
     setupRoots()
 
-    const focusSelectedNav = jest.fn(() => false)
+    const focusSelectedNav = vi.fn(() => false)
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={{ isTouchDevice: false }}>{children}</AppContext.Provider>
     )
@@ -412,12 +412,12 @@ describe('useKeyDown', () => {
           receivingVideo: false,
           inContainer: () => false,
           focusSelectedNav,
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -436,12 +436,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(input)
     input.focus()
 
-    const activateControl = jest.fn(() => false)
+    const activateControl = vi.fn(() => false)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -452,13 +452,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
           isFormField: () => true,
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -482,12 +482,12 @@ describe('useKeyDown', () => {
     document.body.appendChild(dialog)
     dialogBtn.focus()
 
-    const activateControl = jest.fn(() => true)
+    const activateControl = vi.fn(() => true)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -498,13 +498,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -526,8 +526,8 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(btn)
     btn.focus()
 
-    const focusSelectedNav = jest.fn(() => true)
-    const onSetAppContext = jest.fn()
+    const focusSelectedNav = vi.fn(() => true)
+    const onSetAppContext = vi.fn()
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: 'some-btn' },
@@ -544,12 +544,12 @@ describe('useKeyDown', () => {
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
           focusSelectedNav,
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -569,7 +569,7 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(btn)
     btn.focus()
 
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: 'previous-id' },
@@ -585,13 +585,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
           isFormField: () => true,
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -622,7 +622,7 @@ describe('useKeyDown', () => {
       }
     }
 
-    const onSetKeyCommand = jest.fn()
+    const onSetKeyCommand = vi.fn()
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={{ isTouchDevice: false }}>{children}</AppContext.Provider>
     )
@@ -632,13 +632,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: () => false,
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
           onSetKeyCommand,
-          onSetCommandCounter: jest.fn()
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -672,13 +672,13 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(combo)
     combo.focus()
 
-    const dispatchSpy = jest.spyOn(listbox, 'dispatchEvent')
+    const dispatchSpy = vi.spyOn(listbox, 'dispatchEvent')
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -689,13 +689,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -709,12 +709,12 @@ describe('useKeyDown', () => {
     setupRoots()
     mockPathname = ROUTES.MEDIA
 
-    const focusFirstInMain = jest.fn(() => true)
+    const focusFirstInMain = vi.fn(() => true)
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -725,13 +725,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: () => false,
-          focusSelectedNav: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
           focusFirstInMain,
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -752,13 +752,13 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(btn)
     btn.focus()
 
-    const focusSelectedNav = jest.fn(() => true)
+    const focusSelectedNav = vi.fn(() => true)
 
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -770,12 +770,12 @@ describe('useKeyDown', () => {
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
           focusSelectedNav,
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -797,8 +797,8 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(sw)
     sw.focus()
 
-    const activateControl = jest.fn(() => true)
-    const onSetAppContext = jest.fn()
+    const activateControl = vi.fn(() => true)
+    const onSetAppContext = vi.fn()
 
     const context: AppContextProps = {
       isTouchDevice: false,
@@ -815,13 +815,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -843,8 +843,8 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(combo)
     combo.focus()
 
-    const activateControl = jest.fn(() => true)
-    const onSetAppContext = jest.fn()
+    const activateControl = vi.fn(() => true)
+    const onSetAppContext = vi.fn()
 
     const context: AppContextProps = {
       isTouchDevice: false,
@@ -861,13 +861,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -893,7 +893,7 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(input)
     input.focus()
 
-    const onSetAppContext = jest.fn()
+    const onSetAppContext = vi.fn()
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: 'name-field' },
@@ -909,13 +909,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
           isFormField: () => true,
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -936,12 +936,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(div)
     div.focus()
 
-    const activateControl = jest.fn(() => true)
+    const activateControl = vi.fn(() => true)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -952,13 +952,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
-          moveFocusLinear: jest.fn(() => false),
-          isFormField: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
+          moveFocusLinear: vi.fn(() => false),
+          isFormField: vi.fn(() => false),
           activateControl,
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -977,12 +977,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(slider)
     slider.focus()
 
-    const moveFocusLinear = jest.fn(() => true)
+    const moveFocusLinear = vi.fn(() => true)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -993,13 +993,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
           moveFocusLinear,
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -1020,12 +1020,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(slider)
     slider.focus()
 
-    const moveFocusLinear = jest.fn(() => false)
+    const moveFocusLinear = vi.fn(() => false)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: null },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -1036,13 +1036,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
           moveFocusLinear,
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -1063,12 +1063,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(input)
     input.focus()
 
-    const moveFocusLinear = jest.fn(() => true)
+    const moveFocusLinear = vi.fn(() => true)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: 'edit-field' },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -1079,13 +1079,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
           moveFocusLinear,
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )
@@ -1105,12 +1105,12 @@ describe('useKeyDown', () => {
     contentRoot.appendChild(input)
     input.focus()
 
-    const moveFocusLinear = jest.fn(() => true)
+    const moveFocusLinear = vi.fn(() => true)
     const context: AppContextProps = {
       isTouchDevice: false,
       keyboardNavigation: { focusedElId: 'edit-field-r' },
       contentEl: { current: contentRoot },
-      onSetAppContext: jest.fn()
+      onSetAppContext: vi.fn()
     }
     const wrapper = ({ children }: { children: ReactNode }) => (
       <AppContext.Provider value={context}>{children}</AppContext.Provider>
@@ -1121,13 +1121,13 @@ describe('useKeyDown', () => {
         useKeyDown({
           receivingVideo: false,
           inContainer: (root, el) => !!root && !!el && root.contains(el),
-          focusSelectedNav: jest.fn(() => false),
-          focusFirstInMain: jest.fn(() => false),
+          focusSelectedNav: vi.fn(() => false),
+          focusFirstInMain: vi.fn(() => false),
           moveFocusLinear,
-          isFormField: jest.fn(() => false),
-          activateControl: jest.fn(() => false),
-          onSetKeyCommand: jest.fn(),
-          onSetCommandCounter: jest.fn()
+          isFormField: vi.fn(() => false),
+          activateControl: vi.fn(() => false),
+          onSetKeyCommand: vi.fn(),
+          onSetCommandCounter: vi.fn()
         }),
       { wrapper }
     )

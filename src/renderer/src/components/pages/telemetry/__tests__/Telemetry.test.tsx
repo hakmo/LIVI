@@ -3,40 +3,40 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { Telemetry } from '../Telemetry'
 
-const useLiviStoreMock = jest.fn()
-const useNavbarHiddenMock = jest.fn()
-const useKeyboardNavigationMock = jest.fn()
-const normalizeDashComponentsMock = jest.fn()
+const useLiviStoreMock = vi.fn()
+const useNavbarHiddenMock = vi.fn()
+const useKeyboardNavigationMock = vi.fn()
+const normalizeDashComponentsMock = vi.fn()
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (state: { settings: unknown }) => unknown) => useLiviStoreMock(selector)
 }))
 
-jest.mock('@renderer/hooks/useNavbarHidden', () => ({
+vi.mock('@renderer/hooks/useNavbarHidden', () => ({
   useNavbarHidden: () => useNavbarHiddenMock()
 }))
 
-jest.mock('../hooks/useKeyboardNavigation', () => ({
+vi.mock('../hooks/useKeyboardNavigation', () => ({
   useKeyboardNavigation: (args: unknown) => useKeyboardNavigationMock(args)
 }))
 
-jest.mock('@renderer/components/pages/telemetry/utils', () => ({
+vi.mock('@renderer/components/pages/telemetry/utils', () => ({
   normalizeDashComponents: (...args: unknown[]) => normalizeDashComponentsMock(...args)
 }))
 
-jest.mock('@renderer/components/pages/telemetry/config', () => ({
+vi.mock('@renderer/components/pages/telemetry/config', () => ({
   DashboardConfig: {
     dash1: React.createElement('div', { 'data-testid': 'dash-1' }, 'Dash 1'),
     dash2: React.createElement('div', { 'data-testid': 'dash-2' }, 'Dash 2')
   }
 }))
 
-jest.mock('@renderer/components/pages/telemetry/components/DashPlaceholder', () => ({
+vi.mock('@renderer/components/pages/telemetry/components/DashPlaceholder', () => ({
   DashPlaceholder: ({ title }: { title: string }) =>
     React.createElement('div', { 'data-testid': 'dash-placeholder' }, title)
 }))
 
-jest.mock('@renderer/components/pages/telemetry/components/pagination/pagination', () => ({
+vi.mock('@renderer/components/pages/telemetry/components/pagination/pagination', () => ({
   DashboardsPagination: ({
     activeIndex,
     dotsLength,
@@ -61,8 +61,8 @@ jest.mock('@renderer/components/pages/telemetry/components/pagination/pagination
     )
 }))
 
-jest.mock('@renderer/context', () => {
-  const React = require('react')
+vi.mock('@renderer/context', async () => {
+  const React = await import('react')
   return {
     AppContext: React.createContext({})
   }
@@ -84,8 +84,8 @@ const renderWithContext = (ui: React.ReactElement, value: Record<string, unknown
 }
 
 describe('Telemetry', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
 
     useLiviStoreMock.mockImplementation((selector: (state: { settings: unknown }) => unknown) =>
       selector({
@@ -102,16 +102,16 @@ describe('Telemetry', () => {
     })
 
     useKeyboardNavigationMock.mockReturnValue({
-      prev: jest.fn(),
-      next: jest.fn(),
+      prev: vi.fn(),
+      next: vi.fn(),
       canPrev: false,
       canNext: false,
-      onPointerDown: jest.fn(),
-      onPointerUp: jest.fn()
+      onPointerDown: vi.fn(),
+      onPointerUp: vi.fn()
     })
   })
 
-  test('renders fallback when no dashboards are enabled', () => {
+  test('renders fallback when no dashboards are enabled', async () => {
     normalizeDashComponentsMock.mockReturnValue({ dashboards: [] })
 
     renderWithContext(<Telemetry />)
@@ -119,13 +119,13 @@ describe('Telemetry', () => {
     expect(screen.getByTestId('dash-placeholder')).toHaveTextContent('No dashboards enabled')
   })
 
-  test('renders configured dashboard for current index', () => {
+  test('renders configured dashboard for current index', async () => {
     renderWithContext(<Telemetry />)
 
     expect(screen.getByTestId('dash-1')).toBeInTheDocument()
   })
 
-  test('renders unknown fallback when dashboard id is not in config', () => {
+  test('renders unknown fallback when dashboard id is not in config', async () => {
     normalizeDashComponentsMock.mockReturnValue({
       dashboards: [{ id: 'unknownDash', pos: 1 }]
     })
@@ -135,7 +135,7 @@ describe('Telemetry', () => {
     expect(screen.getByTestId('dash-placeholder')).toHaveTextContent('Unknown dash')
   })
 
-  test('renders pagination only when more than one dashboard exists', () => {
+  test('renders pagination only when more than one dashboard exists', async () => {
     normalizeDashComponentsMock.mockReturnValue({
       dashboards: [
         { id: 'dash1', pos: 1 },
@@ -148,13 +148,13 @@ describe('Telemetry', () => {
     expect(screen.getByTestId('pagination')).toBeInTheDocument()
   })
 
-  test('does not render pagination when only one dashboard exists', () => {
+  test('does not render pagination when only one dashboard exists', async () => {
     renderWithContext(<Telemetry />)
 
     expect(screen.queryByTestId('pagination')).toBeNull()
   })
 
-  test('switches dashboard when pagination changes index', () => {
+  test('switches dashboard when pagination changes index', async () => {
     normalizeDashComponentsMock.mockReturnValue({
       dashboards: [
         { id: 'dash1', pos: 1 },
@@ -171,18 +171,18 @@ describe('Telemetry', () => {
     expect(screen.getByTestId('dash-2')).toBeInTheDocument()
   })
 
-  test('passes telemetry pager into app context and cleans up on unmount', () => {
-    const prev = jest.fn()
-    const next = jest.fn()
-    const onSetAppContext = jest.fn()
+  test('passes telemetry pager into app context and cleans up on unmount', async () => {
+    const prev = vi.fn()
+    const next = vi.fn()
+    const onSetAppContext = vi.fn()
 
     useKeyboardNavigationMock.mockReturnValue({
       prev,
       next,
       canPrev: true,
       canNext: true,
-      onPointerDown: jest.fn(),
-      onPointerUp: jest.fn()
+      onPointerDown: vi.fn(),
+      onPointerUp: vi.fn()
     })
 
     const { unmount } = renderWithContext(<Telemetry />, { onSetAppContext })
@@ -198,13 +198,13 @@ describe('Telemetry', () => {
     })
   })
 
-  test('does not try to register app context when onSetAppContext is missing', () => {
+  test('does not try to register app context when onSetAppContext is missing', async () => {
     renderWithContext(<Telemetry />, {})
 
     expect(screen.getByTestId('dash-1')).toBeInTheDocument()
   })
 
-  test('uses fixed positioning when navbar is hidden', () => {
+  test('uses fixed positioning when navbar is hidden', async () => {
     useNavbarHiddenMock.mockReturnValue({ isNavbarHidden: true })
 
     const { container } = renderWithContext(<Telemetry />)
@@ -212,13 +212,13 @@ describe('Telemetry', () => {
     expect(container.firstChild).toHaveStyle({ position: 'fixed' })
   })
 
-  test('wires pointer handlers from keyboard navigation hook', () => {
-    const onPointerDown = jest.fn()
-    const onPointerUp = jest.fn()
+  test('wires pointer handlers from keyboard navigation hook', async () => {
+    const onPointerDown = vi.fn()
+    const onPointerUp = vi.fn()
 
     useKeyboardNavigationMock.mockReturnValue({
-      prev: jest.fn(),
-      next: jest.fn(),
+      prev: vi.fn(),
+      next: vi.fn(),
       canPrev: false,
       canNext: false,
       onPointerDown,

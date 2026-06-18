@@ -2,18 +2,18 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { Controls } from '../controls'
 
-const circleBtnStyleMock = jest.fn((size: number, state: unknown) => ({
+const circleBtnStyleMock = vi.fn((size: number, state: unknown) => ({
   width: size,
   height: size,
   border: 'none',
   ...(state as object)
 }))
 
-jest.mock('../../styles', () => ({
+vi.mock('../../styles', () => ({
   circleBtnStyle: (...args: Parameters<typeof circleBtnStyleMock>) => circleBtnStyleMock(...args)
 }))
 
-jest.mock('@mui/material/styles', () => ({
+vi.mock('@mui/material/styles', () => ({
   useTheme: () => ({
     palette: {
       primary: {
@@ -23,7 +23,7 @@ jest.mock('@mui/material/styles', () => ({
   })
 }))
 
-jest.mock('@mui/icons-material/PlayArrow', () => ({
+vi.mock('@mui/icons-material/PlayArrow', () => ({
   __esModule: true,
   default: ({ sx }: { sx?: Record<string, unknown> }) => (
     <span data-testid="play-icon" data-sx={JSON.stringify(sx ?? {})}>
@@ -32,7 +32,7 @@ jest.mock('@mui/icons-material/PlayArrow', () => ({
   )
 }))
 
-jest.mock('@mui/icons-material/Pause', () => ({
+vi.mock('@mui/icons-material/Pause', () => ({
   __esModule: true,
   default: ({ sx }: { sx?: Record<string, unknown> }) => (
     <span data-testid="pause-icon" data-sx={JSON.stringify(sx ?? {})}>
@@ -41,7 +41,7 @@ jest.mock('@mui/icons-material/Pause', () => ({
   )
 }))
 
-jest.mock('@mui/icons-material/SkipNext', () => ({
+vi.mock('@mui/icons-material/SkipNext', () => ({
   __esModule: true,
   default: ({ sx }: { sx?: Record<string, unknown> }) => (
     <span data-testid="next-icon" data-sx={JSON.stringify(sx ?? {})}>
@@ -50,7 +50,7 @@ jest.mock('@mui/icons-material/SkipNext', () => ({
   )
 }))
 
-jest.mock('@mui/icons-material/SkipPrevious', () => ({
+vi.mock('@mui/icons-material/SkipPrevious', () => ({
   __esModule: true,
   default: ({ sx }: { sx?: Record<string, unknown> }) => (
     <span data-testid="prev-icon" data-sx={JSON.stringify(sx ?? {})}>
@@ -60,10 +60,10 @@ jest.mock('@mui/icons-material/SkipPrevious', () => ({
 }))
 
 describe('Controls', () => {
-  const onPrev = jest.fn()
-  const onPlayPause = jest.fn()
-  const onNext = jest.fn()
-  const onSetFocus = jest.fn()
+  const onPrev = vi.fn()
+  const onPlayPause = vi.fn()
+  const onNext = vi.fn()
+  const onSetFocus = vi.fn()
 
   const prevBtnRef = React.createRef<HTMLButtonElement>()
   const playBtnRef = React.createRef<HTMLButtonElement>()
@@ -91,7 +91,7 @@ describe('Controls', () => {
     )
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   test('renders previous, play/pause and next buttons', () => {
@@ -163,9 +163,9 @@ describe('Controls', () => {
     const playButton = screen.getByLabelText('Play/Pause')
     const nextButton = screen.getByLabelText('Next')
 
-    const prevBlur = jest.spyOn(prevButton, 'blur')
-    const playBlur = jest.spyOn(playButton, 'blur')
-    const nextBlur = jest.spyOn(nextButton, 'blur')
+    const prevBlur = vi.spyOn(prevButton, 'blur')
+    const playBlur = vi.spyOn(playButton, 'blur')
+    const nextBlur = vi.spyOn(nextButton, 'blur')
 
     fireEvent.mouseUp(prevButton)
     fireEvent.mouseUp(playButton)

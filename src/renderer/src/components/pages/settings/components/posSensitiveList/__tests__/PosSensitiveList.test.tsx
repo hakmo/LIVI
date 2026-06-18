@@ -2,11 +2,11 @@ import type { PosListNode } from '@renderer/routes/types'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { PosSensitiveList } from '../PosSensitiveList'
 
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key })
 }))
 
-jest.mock('../../stackItem', () => ({
+vi.mock('../../stackItem', () => ({
   StackItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
     <div data-testid="stack-item" onClick={onClick}>
       {children}
@@ -14,7 +14,7 @@ jest.mock('../../stackItem', () => ({
   )
 }))
 
-jest.mock('@mui/material', () => ({
+vi.mock('@mui/material', () => ({
   Box: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
     <div {...rest}>{children}</div>
   ),
@@ -35,15 +35,15 @@ jest.mock('@mui/material', () => ({
   )
 }))
 
-jest.mock('@mui/icons-material/ExpandLess', () => ({
+vi.mock('@mui/icons-material/ExpandLess', () => ({
   __esModule: true,
   default: () => <span data-testid="up-icon" />
 }))
-jest.mock('@mui/icons-material/ExpandMore', () => ({
+vi.mock('@mui/icons-material/ExpandMore', () => ({
   __esModule: true,
   default: () => <span data-testid="down-icon" />
 }))
-jest.mock('@mui/icons-material/ChevronRight', () => ({
+vi.mock('@mui/icons-material/ChevronRight', () => ({
   __esModule: true,
   default: () => <span data-testid="chev-icon" />
 }))
@@ -113,8 +113,8 @@ describe('PosSensitiveList', () => {
   })
 
   test('clicking up swaps the row with its neighbour and stops event propagation', () => {
-    const onChange = jest.fn()
-    const onItemClick = jest.fn()
+    const onChange = vi.fn()
+    const onItemClick = vi.fn()
     render(
       <PosSensitiveList
         node={node}
@@ -136,7 +136,7 @@ describe('PosSensitiveList', () => {
   })
 
   test('clicking down swaps with the next row', () => {
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     render(<PosSensitiveList node={node} value={undefined} onChange={onChange} />)
     const downs = screen
       .getAllByTestId('down-icon')
@@ -154,13 +154,13 @@ describe('PosSensitiveList', () => {
     expect(screen.queryByTestId('chev-icon')).toBeNull()
 
     rerender(
-      <PosSensitiveList node={node} value={undefined} onChange={() => {}} onItemClick={jest.fn()} />
+      <PosSensitiveList node={node} value={undefined} onChange={() => {}} onItemClick={vi.fn()} />
     )
     expect(screen.getAllByTestId('chev-icon').length).toBe(node.items.length)
   })
 
   test('row click invokes onItemClick with route or id fallback', () => {
-    const onItemClick = jest.fn()
+    const onItemClick = vi.fn()
     render(
       <PosSensitiveList
         node={node}
@@ -177,7 +177,7 @@ describe('PosSensitiveList', () => {
   })
 
   test('swap is a no-op for out-of-bounds indices (e.g. up on first row)', () => {
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     render(<PosSensitiveList node={node} value={undefined} onChange={onChange} />)
     // First row's up button is disabled, but assert no onChange even when fired programmatically
     const ups = screen.getAllByTestId('up-icon').map((u) => u.parentElement as HTMLButtonElement)
@@ -192,7 +192,7 @@ describe('PosSensitiveList', () => {
   })
 
   test('preserves untouched slot data when reordering', () => {
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     const value = {
       a: { pos: 1, extra: 'keep-me' },
       b: { pos: 2, extra: 'also' },

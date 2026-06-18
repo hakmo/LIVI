@@ -2,9 +2,9 @@
 
 describe('store in node environment', () => {
   test('module init handles missing window', async () => {
-    jest.resetModules()
+    vi.resetModules()
 
-    const { useLiviStore } = require('../store') as typeof import('../store')
+    const { useLiviStore } = await import('../store')
 
     await Promise.resolve()
 

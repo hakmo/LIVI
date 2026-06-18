@@ -3,7 +3,7 @@ import { DashboardConfig } from '../config'
 import { Dash1, Dash2, Dash3, Dash4 } from '../dashboards'
 import { TelemetryDashboardIds } from '../types'
 
-jest.mock('../dashboards', () => ({
+vi.mock('../dashboards', () => ({
   Dash1: () => React.createElement('div', { 'data-testid': 'dash1' }),
   Dash2: () => React.createElement('div', { 'data-testid': 'dash2' }),
   Dash3: () => React.createElement('div', { 'data-testid': 'dash3' }),

@@ -4,13 +4,13 @@ import { createRef } from 'react'
 import { useProjectionMultiTouch } from '../useProjectionTouch'
 
 describe('useProjectionMultiTouch', () => {
-  const sendTouch = jest.fn()
-  const sendMultiTouch = jest.fn()
+  const sendTouch = vi.fn()
+  const sendMultiTouch = vi.fn()
 
   const createTarget = () => {
     const el = document.createElement('div')
-    el.setPointerCapture = jest.fn()
-    el.releasePointerCapture = jest.fn()
+    el.setPointerCapture = vi.fn()
+    el.releasePointerCapture = vi.fn()
     Object.defineProperty(el, 'getBoundingClientRect', {
       value: () => ({
         left: 0,
@@ -38,7 +38,7 @@ describe('useProjectionMultiTouch', () => {
     }) as React.PointerEvent<HTMLDivElement>
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
     ;(window as any).projection = {
       ipc: {
         sendTouch,
@@ -163,7 +163,7 @@ describe('useProjectionMultiTouch', () => {
     videoRef.current = target
 
     const { result } = renderHook(() => useProjectionMultiTouch(videoRef))
-    const preventDefault = jest.fn()
+    const preventDefault = vi.fn()
 
     result.current.onContextMenu({ preventDefault } as unknown as React.MouseEvent<HTMLDivElement>)
     expect(preventDefault).toHaveBeenCalled()

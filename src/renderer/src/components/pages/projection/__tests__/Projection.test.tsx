@@ -2,11 +2,11 @@ import { AudioCommand, CommandMapping } from '@shared/types/ProjectionEnums'
 import { act, render, waitFor } from '@testing-library/react'
 import { Projection } from '../Projection'
 
-const navigateMock = jest.fn()
+const navigateMock = vi.fn()
 let mockPathname = '/'
 
-jest.mock('@worker/createProjectionWorker', () => ({
-  createProjectionWorker: jest.fn()
+vi.mock('@worker/createProjectionWorker', () => ({
+  createProjectionWorker: vi.fn()
 }))
 
 type AnyFn = (...args: any[]) => any
@@ -15,9 +15,9 @@ const statusState: Record<string, any> = {
   isStreaming: true,
   isDongleConnected: true,
   isAaActive: false,
-  setStreaming: jest.fn(),
-  setDongleConnected: jest.fn(),
-  setAaActive: jest.fn()
+  setStreaming: vi.fn(),
+  setDongleConnected: vi.fn(),
+  setAaActive: vi.fn()
 }
 
 const liviState: Record<string, any> = {
@@ -25,19 +25,19 @@ const liviState: Record<string, any> = {
   negotiatedHeight: 0,
   dongleFwVersion: '',
   boxInfo: null,
-  resetInfo: jest.fn(),
-  setDeviceInfo: jest.fn(),
-  setAudioInfo: jest.fn(),
-  setPcmData: jest.fn(),
-  setBluetoothPairedList: jest.fn()
+  resetInfo: vi.fn(),
+  setDeviceInfo: vi.fn(),
+  setAudioInfo: vi.fn(),
+  setPcmData: vi.fn(),
+  setBluetoothPairedList: vi.fn()
 }
 
-jest.mock('react-router', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
   useLocation: () => ({ pathname: mockPathname })
 }))
 
-jest.mock('../../../../store/store', () => {
+vi.mock('../../../../store/store', async () => {
   const useStatusStore: any = (selector: AnyFn) => selector(statusState)
   useStatusStore.setState = (patch: Record<string, any>) => Object.assign(statusState, patch)
 
@@ -53,14 +53,14 @@ jest.mock('../../../../store/store', () => {
   return { useStatusStore, useLiviStore }
 })
 
-jest.mock('../hooks/useProjectionTouch', () => ({
+vi.mock('../hooks/useProjectionTouch', () => ({
   useProjectionMultiTouch: () => ({})
 }))
 
 class MockWorker {
   static instances: MockWorker[] = []
-  public postMessage = jest.fn()
-  public terminate = jest.fn()
+  public postMessage = vi.fn()
+  public terminate = vi.fn()
   public onerror: AnyFn | null = null
   private listeners: Array<(ev: MessageEvent<any>) => void> = []
 
@@ -87,7 +87,7 @@ class MockWorker {
 
 class MockMessageChannel {
   static instances: MockMessageChannel[] = []
-  port1 = { postMessage: jest.fn() }
+  port1 = { postMessage: vi.fn() }
   port2 = {}
   constructor() {
     MockMessageChannel.instances.push(this)
@@ -98,7 +98,7 @@ describe('Projection page', () => {
   let onEventCb: AnyFn | undefined
   let usbCb: AnyFn | undefined
 
-  beforeEach(() => {
+  beforeEach(async () => {
     MockWorker.instances = []
     MockMessageChannel.instances = []
     navigateMock.mockReset()
@@ -127,37 +127,39 @@ describe('Projection page', () => {
     statusState.setStreaming.mockClear()
     statusState.setDongleConnected.mockClear()
 
-    const { createProjectionWorker } = jest.requireMock('@worker/createProjectionWorker')
+    const { createProjectionWorker } = await vi.importMock('@worker/createProjectionWorker')
 
     createProjectionWorker.mockImplementation(() => new MockWorker('projection'))
     ;(global as any).Worker = MockWorker
     ;(global as any).MessageChannel = MockMessageChannel
-    ;(global as any).ResizeObserver = jest.fn(() => ({
-      observe: jest.fn(),
-      disconnect: jest.fn()
-    }))
+    ;(global as any).ResizeObserver = vi.fn(function () {
+      return {
+        observe: vi.fn(),
+        disconnect: vi.fn()
+      }
+    })
 
     Object.defineProperty(HTMLCanvasElement.prototype, 'transferControlToOffscreen', {
       configurable: true,
-      value: jest.fn(() => ({}))
+      value: vi.fn(() => ({}))
     })
     ;(window as any).projection = {
       ipc: {
-        start: jest.fn().mockResolvedValue(undefined),
-        stop: jest.fn().mockResolvedValue(undefined),
-        sendFrame: jest.fn().mockResolvedValue(undefined),
-        setVisible: jest.fn().mockResolvedValue(undefined),
-        onAudioChunk: jest.fn(),
-        offAudioChunk: jest.fn(),
-        onEvent: jest.fn((cb: AnyFn) => (onEventCb = cb)),
-        offEvent: jest.fn(),
-        sendCommand: jest.fn()
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        sendFrame: vi.fn().mockResolvedValue(undefined),
+        setVisible: vi.fn().mockResolvedValue(undefined),
+        onAudioChunk: vi.fn(),
+        offAudioChunk: vi.fn(),
+        onEvent: vi.fn((cb: AnyFn) => (onEventCb = cb)),
+        offEvent: vi.fn(),
+        sendCommand: vi.fn()
       },
       usb: {
-        getDeviceInfo: jest.fn().mockResolvedValue({ device: true }),
-        getLastEvent: jest.fn().mockResolvedValue(null),
-        listenForEvents: jest.fn((cb: AnyFn) => (usbCb = cb)),
-        unlistenForEvents: jest.fn()
+        getDeviceInfo: vi.fn().mockResolvedValue({ device: true }),
+        getLastEvent: vi.fn().mockResolvedValue(null),
+        listenForEvents: vi.fn((cb: AnyFn) => (usbCb = cb)),
+        unlistenForEvents: vi.fn()
       }
     }
   })
@@ -174,7 +176,7 @@ describe('Projection page', () => {
   })
 
   test('usb unplugged stops projection and clears streaming state', async () => {
-    const setReceivingVideo = jest.fn()
+    const setReceivingVideo = vi.fn()
 
     render(<Projection {...baseProps({ setReceivingVideo })} receivingVideo />)
 
@@ -189,8 +191,8 @@ describe('Projection page', () => {
     expect(liviState.resetInfo).toHaveBeenCalled()
   })
 
-  test('forces video hidden when streaming becomes false', () => {
-    const setReceivingVideo = jest.fn()
+  test('forces video hidden when streaming becomes false', async () => {
+    const setReceivingVideo = vi.fn()
 
     const { rerender } = render(<Projection {...baseProps({ setReceivingVideo })} receivingVideo />)
 
@@ -201,10 +203,10 @@ describe('Projection page', () => {
     expect(setReceivingVideo).toHaveBeenCalledWith(false)
   })
 
-  test('handles worker failure and schedules retry timer', () => {
-    jest.useFakeTimers()
+  test('handles worker failure and schedules retry timer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
-    const setTimeoutSpy = jest.spyOn(window, 'setTimeout')
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
 
     render(<Projection {...baseProps()} />)
 
@@ -221,10 +223,10 @@ describe('Projection page', () => {
     expect(typeof timeoutCall?.[0]).toBe('function')
 
     setTimeoutSpy.mockRestore()
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
-  test('handles bluetoothPairedList event from payload string', () => {
+  test('handles bluetoothPairedList event from payload string', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -237,7 +239,7 @@ describe('Projection page', () => {
     expect(liviState.setBluetoothPairedList).toHaveBeenCalledWith('device-a\ndevice-b')
   })
 
-  test('handles dongleInfo event and merges box info', () => {
+  test('handles dongleInfo event and merges box info', async () => {
     liviState.boxInfo = { existing: 'keep', MDLinkType: 'CarPlay' }
     liviState.dongleFwVersion = 'old-fw'
 
@@ -261,7 +263,7 @@ describe('Projection page', () => {
     })
   })
 
-  test('handles audioInfo event', () => {
+  test('handles audioInfo event', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -299,7 +301,7 @@ describe('Projection page', () => {
     })
   })
 
-  test('handles bluetoothPairedList event', () => {
+  test('handles bluetoothPairedList event', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -312,7 +314,7 @@ describe('Projection page', () => {
     expect(liviState.setBluetoothPairedList).toHaveBeenCalledWith('device-a\ndevice-b')
   })
 
-  test('handles dongleInfo event', () => {
+  test('handles dongleInfo event', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -329,7 +331,7 @@ describe('Projection page', () => {
     expect(liviState.boxInfo).toEqual({ MDLinkType: 'AndroidAuto', foo: 'bar' })
   })
 
-  test('handles audioInfo event', () => {
+  test('handles audioInfo event', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -386,7 +388,7 @@ describe('Projection page', () => {
     mockPathname = '/media'
     statusState.isStreaming = false
 
-    const setReceivingVideo = jest.fn()
+    const setReceivingVideo = vi.fn()
 
     render(
       <Projection
@@ -485,7 +487,7 @@ describe('Projection page', () => {
     })
   })
 
-  test('releaseVideoFocus does nothing when auto switch on stream is disabled', () => {
+  test('releaseVideoFocus does nothing when auto switch on stream is disabled', async () => {
     mockPathname = '/'
 
     render(
@@ -513,10 +515,10 @@ describe('Projection page', () => {
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
-  test('requestClusterFocus shows overlay when maps disabled', () => {
+  test('requestClusterFocus shows overlay when maps disabled', async () => {
     mockPathname = '/media'
 
-    const setNavVideoOverlayActive = jest.fn()
+    const setNavVideoOverlayActive = vi.fn()
 
     render(
       <Projection
@@ -742,7 +744,7 @@ describe('Projection page', () => {
     })
   })
 
-  test('sends key command when commandCounter changes and stream is active', () => {
+  test('sends key command when commandCounter changes and stream is active', async () => {
     statusState.isStreaming = true
 
     render(<Projection {...baseProps()} command={'home' as any} commandCounter={1} />)
@@ -750,7 +752,7 @@ describe('Projection page', () => {
     expect((window as any).projection.ipc.sendCommand).toHaveBeenCalledWith('home')
   })
 
-  test('does not re-send last key command on isStreaming flicker', () => {
+  test('does not re-send last key command on isStreaming flicker', async () => {
     statusState.isStreaming = true
 
     const { rerender } = render(
@@ -769,7 +771,7 @@ describe('Projection page', () => {
 
   // ── IPC plugged / unplugged / failure events ──────────────────────────────
 
-  test('IPC plugged event marks dongle connected', () => {
+  test('IPC plugged event marks dongle connected', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -779,9 +781,9 @@ describe('Projection page', () => {
     expect(statusState.setDongleConnected).toHaveBeenCalledWith(true)
   })
 
-  test('IPC unplugged event clears all streaming state', () => {
-    const setReceivingVideo = jest.fn()
-    const setNavVideoOverlayActive = jest.fn()
+  test('IPC unplugged event clears all streaming state', async () => {
+    const setReceivingVideo = vi.fn()
+    const setNavVideoOverlayActive = vi.fn()
 
     render(<Projection {...baseProps({ setReceivingVideo, setNavVideoOverlayActive })} />)
 
@@ -795,9 +797,9 @@ describe('Projection page', () => {
     expect(setNavVideoOverlayActive).toHaveBeenCalledWith(false)
   })
 
-  test('IPC failure event clears all streaming state', () => {
-    const setReceivingVideo = jest.fn()
-    const setNavVideoOverlayActive = jest.fn()
+  test('IPC failure event clears all streaming state', async () => {
+    const setReceivingVideo = vi.fn()
+    const setNavVideoOverlayActive = vi.fn()
 
     render(<Projection {...baseProps({ setReceivingVideo, setNavVideoOverlayActive })} />)
 
@@ -889,7 +891,7 @@ describe('Projection page', () => {
   })
 
   test('AudioVoiceAssistantStop returns to previous route via debounce timer', async () => {
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     mockPathname = '/media'
 
     const { rerender } = render(<Projection {...baseProps()} />)
@@ -917,17 +919,17 @@ describe('Projection page', () => {
     expect(navigateMock).not.toHaveBeenCalled()
 
     act(() => {
-      jest.advanceTimersByTime(200)
+      vi.advanceTimersByTime(200)
     })
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   // ── applyAttention: already on projection path ────────────────────────────
 
-  test('applyAttention does nothing when already on projection route', () => {
+  test('applyAttention does nothing when already on projection route', async () => {
     mockPathname = '/'
 
     render(
@@ -950,7 +952,7 @@ describe('Projection page', () => {
   // ── clearVoiceAssistantReleaseTimer when timer is already set ─────────────
 
   test('clearVoiceAssistantReleaseTimer cancels pending debounce on second active', async () => {
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     mockPathname = '/media'
 
     const { rerender } = render(<Projection {...baseProps()} />)
@@ -986,15 +988,15 @@ describe('Projection page', () => {
     })
 
     // Timer should have been cancelled, so no navigation after advance
-    act(() => jest.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(200))
     expect(navigateMock).not.toHaveBeenCalledWith('/media', expect.anything())
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   // ── mergeBoxInfo: string variants ────────────────────────────────────────
 
-  test('mergeBoxInfo merges when boxInfo payload arrives as JSON string', () => {
+  test('mergeBoxInfo merges when boxInfo payload arrives as JSON string', async () => {
     liviState.boxInfo = { existing: 'keep' }
 
     render(<Projection {...baseProps()} />)
@@ -1012,7 +1014,7 @@ describe('Projection page', () => {
     expect(liviState.boxInfo).toMatchObject({ existing: 'keep', MDLinkType: 'CarPlay' })
   })
 
-  test('mergeBoxInfo merges when existing boxInfo is a JSON string', () => {
+  test('mergeBoxInfo merges when existing boxInfo is a JSON string', async () => {
     liviState.boxInfo = '{"old":"data"}'
 
     render(<Projection {...baseProps()} />)
@@ -1030,7 +1032,7 @@ describe('Projection page', () => {
     expect(liviState.boxInfo).toMatchObject({ old: 'data', MDLinkType: 'AndroidAuto' })
   })
 
-  test('mergeBoxInfo returns prev when boxInfo payload is an empty string', () => {
+  test('mergeBoxInfo returns prev when boxInfo payload is an empty string', async () => {
     liviState.boxInfo = { preserved: true }
 
     render(<Projection {...baseProps()} />)
@@ -1047,8 +1049,8 @@ describe('Projection page', () => {
 
   // ── handleAudio: PCM conversion ───────────────────────────────────────────
 
-  test('handleAudio converts int16 chunk to float32 and schedules setPcmData', () => {
-    jest.useFakeTimers()
+  test('handleAudio converts int16 chunk to float32 and schedules setPcmData', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
     render(<Projection {...baseProps()} />)
 
@@ -1060,7 +1062,7 @@ describe('Projection page', () => {
 
     act(() => {
       audioChunkFn?.({ chunk: { buffer: buf } })
-      jest.runAllTimers()
+      vi.runAllTimers()
     })
 
     expect(liviState.setPcmData).toHaveBeenCalledTimes(1)
@@ -1070,11 +1072,11 @@ describe('Projection page', () => {
     expect(f32[0]).toBeCloseTo(0)
     expect(f32[1]).toBeCloseTo(0.5, 1)
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
-  test('handleAudio cleanup clears pending timers on unmount', () => {
-    jest.useFakeTimers()
+  test('handleAudio cleanup clears pending timers on unmount', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
     const { unmount } = render(<Projection {...baseProps()} />)
 
@@ -1090,20 +1092,20 @@ describe('Projection page', () => {
     unmount()
 
     act(() => {
-      jest.runAllTimers()
+      vi.runAllTimers()
     })
 
     expect(liviState.setPcmData).not.toHaveBeenCalled()
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   // ── projection worker: requestBuffer & audio messages ────────────────────
 
-  test('projection worker requestBuffer message calls clearRetryTimeout', () => {
-    jest.useFakeTimers()
+  test('projection worker requestBuffer message calls clearRetryTimeout', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
-    const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout')
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
 
     render(<Projection {...baseProps()} />)
 
@@ -1122,10 +1124,10 @@ describe('Projection page', () => {
     expect(clearTimeoutSpy).toHaveBeenCalled()
 
     clearTimeoutSpy.mockRestore()
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
-  test('projection worker audio message calls clearRetryTimeout', () => {
+  test('projection worker audio message calls clearRetryTimeout', async () => {
     render(<Projection {...baseProps()} />)
 
     const projectionWorker = MockWorker.instances[0]
@@ -1138,8 +1140,8 @@ describe('Projection page', () => {
 
   // ── clearRetryTimeout with active timer ───────────────────────────────────
 
-  test('clearRetryTimeout clears an active retry timeout', () => {
-    jest.useFakeTimers()
+  test('clearRetryTimeout clears an active retry timeout', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
 
     render(<Projection {...baseProps()} />)
 
@@ -1155,9 +1157,9 @@ describe('Projection page', () => {
     })
 
     // Timer was cleared; reload should not fire
-    act(() => jest.advanceTimersByTime(5000))
+    act(() => vi.advanceTimersByTime(5000))
 
-    jest.useRealTimers()
+    vi.useRealTimers()
   })
 
   // ── requestVideoFocus blocked by attention ────────────────────────────────
@@ -1196,9 +1198,9 @@ describe('Projection page', () => {
 
   // ── releaseClusterFocus with no cluster display dismisses overlay ────────────
 
-  test('releaseClusterFocus with no cluster display calls setNavVideoOverlayActive(false)', () => {
+  test('releaseClusterFocus with no cluster display calls setNavVideoOverlayActive(false)', async () => {
     mockPathname = '/media'
-    const setNavVideoOverlayActive = jest.fn()
+    const setNavVideoOverlayActive = vi.fn()
 
     render(
       <Projection
@@ -1349,7 +1351,7 @@ describe('Projection page', () => {
 
   // ── projection worker: audioInfo / pcmData / command / unknown ───────────
 
-  test('projection worker audioInfo message calls setAudioInfo', () => {
+  test('projection worker audioInfo message calls setAudioInfo', async () => {
     render(<Projection {...baseProps()} />)
 
     const projectionWorker = MockWorker.instances[0]
@@ -1369,7 +1371,7 @@ describe('Projection page', () => {
     })
   })
 
-  test('projection worker pcmData message calls setPcmData', () => {
+  test('projection worker pcmData message calls setPcmData', async () => {
     render(<Projection {...baseProps()} />)
 
     const projectionWorker = MockWorker.instances[0]
@@ -1399,7 +1401,7 @@ describe('Projection page', () => {
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
   })
 
-  test('IPC command with unrecognized value hits final break', () => {
+  test('IPC command with unrecognized value hits final break', async () => {
     render(<Projection {...baseProps()} />)
 
     act(() => {
@@ -1416,9 +1418,9 @@ describe('Projection page', () => {
   // ── USB getDeviceInfo failure ─────────────────────────────────────────────
 
   test('USB connect logs warning when getDeviceInfo throws', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-    ;(window as any).projection.usb.getDeviceInfo = jest
+    ;(window as any).projection.usb.getDeviceInfo = vi
       .fn()
       .mockRejectedValue(new Error('no device'))
 
@@ -1438,7 +1440,7 @@ describe('Projection page', () => {
 
   // ── mergeBoxInfo edge cases ───────────────────────────────────────────────
 
-  test('mergeBoxInfo returns prev when boxInfo is an invalid JSON string', () => {
+  test('mergeBoxInfo returns prev when boxInfo is an invalid JSON string', async () => {
     liviState.boxInfo = { preserved: true }
 
     render(<Projection {...baseProps()} />)
@@ -1453,7 +1455,7 @@ describe('Projection page', () => {
     expect(liviState.boxInfo).toMatchObject({ preserved: true })
   })
 
-  test('mergeBoxInfo sets prev to null when existing boxInfo is invalid JSON string', () => {
+  test('mergeBoxInfo sets prev to null when existing boxInfo is invalid JSON string', async () => {
     liviState.boxInfo = '{bad json'
 
     render(<Projection {...baseProps()} />)
@@ -1468,7 +1470,7 @@ describe('Projection page', () => {
     expect(liviState.boxInfo).toMatchObject({ MDLinkType: 'CarPlay' })
   })
 
-  test('mergeBoxInfo sets prev to null when existing boxInfo is an empty string', () => {
+  test('mergeBoxInfo sets prev to null when existing boxInfo is an empty string', async () => {
     liviState.boxInfo = '   '
 
     render(<Projection {...baseProps()} />)
@@ -1486,7 +1488,7 @@ describe('Projection page', () => {
 
   // ── projection worker: dongleInfo no-op case ─────────────────────────────
 
-  test('projection worker dongleInfo message is silently ignored', () => {
+  test('projection worker dongleInfo message is silently ignored', async () => {
     render(<Projection {...baseProps()} />)
 
     // Should not throw
@@ -1532,8 +1534,8 @@ describe('Projection page', () => {
 
   // ── projection worker onerror handler ────────────────────────────────────
 
-  test('projection worker onerror logs to console.error', () => {
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  test('projection worker onerror logs to console.error', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     render(<Projection {...baseProps()} />)
 
@@ -1547,7 +1549,7 @@ describe('Projection page', () => {
 
   // ── recalc runs when content-root element is present ─────────────────────
 
-  test('overlay offset recalc runs when content-root is in the DOM', () => {
+  test('overlay offset recalc runs when content-root is in the DOM', async () => {
     const anchor = document.createElement('div')
     anchor.id = 'content-root'
     document.body.appendChild(anchor)
@@ -1562,9 +1564,9 @@ describe('Projection page', () => {
 
   // ── navVideoOverlayActive pointerdown dismiss ─────────────────────────────
 
-  test('navVideoOverlayActive pointerdown dismisses overlay', () => {
+  test('navVideoOverlayActive pointerdown dismisses overlay', async () => {
     mockPathname = '/media'
-    const setNavVideoOverlayActive = jest.fn()
+    const setNavVideoOverlayActive = vi.fn()
 
     render(<Projection {...baseProps({ setNavVideoOverlayActive })} navVideoOverlayActive={true} />)
 
@@ -1581,7 +1583,7 @@ describe('Projection page', () => {
 function baseProps(overrides: any = {}) {
   return {
     receivingVideo: false,
-    setReceivingVideo: jest.fn(),
+    setReceivingVideo: vi.fn(),
     settings: {
       width: 800,
       height: 480,
@@ -1591,7 +1593,7 @@ function baseProps(overrides: any = {}) {
     command: '' as any,
     commandCounter: 0,
     navVideoOverlayActive: false,
-    setNavVideoOverlayActive: jest.fn(),
+    setNavVideoOverlayActive: vi.fn(),
     ...overrides
   }
 }

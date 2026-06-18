@@ -4,9 +4,11 @@ import { DashShell } from '../DashShell'
 
 describe('DashShell', () => {
   test('renders children and attaches ResizeObserver', () => {
-    const observe = jest.fn()
-    const disconnect = jest.fn()
-    ;(global as any).ResizeObserver = jest.fn(() => ({ observe, disconnect }))
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    ;(global as any).ResizeObserver = vi.fn(function () {
+      return { observe, disconnect }
+    })
 
     const { unmount } = render(
       <div style={{ width: 400, height: 300 }}>
@@ -30,9 +32,11 @@ describe('DashPlaceholder', () => {
     contentRoot.id = 'content-root'
     document.body.appendChild(contentRoot)
 
-    const observe = jest.fn()
-    const disconnect = jest.fn()
-    ;(global as any).MutationObserver = jest.fn(() => ({ observe, disconnect }))
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    ;(global as any).MutationObserver = vi.fn(function () {
+      return { observe, disconnect }
+    })
 
     const { unmount } = render(<DashPlaceholder title="Telemetry" />)
 

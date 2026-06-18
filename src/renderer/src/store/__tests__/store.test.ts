@@ -1,42 +1,43 @@
 import type { Config } from '@shared/types'
+import type { Mock } from 'vitest'
 
 type ProjectionApiOverrides = {
   settings?: {
-    get?: jest.Mock | undefined
-    save?: jest.Mock | undefined
-    onUpdate?: jest.Mock | undefined
+    get?: Mock | undefined
+    save?: Mock | undefined
+    onUpdate?: Mock | undefined
   }
   usb?: {
-    forceReset?: jest.Mock | undefined
+    forceReset?: Mock | undefined
   }
   ipc?: {
-    setVolume?: jest.Mock | undefined
-    setBluetoothPairedList?: jest.Mock | undefined
-    connectBluetoothPairedDevice?: jest.Mock | undefined
-    forgetBluetoothPairedDevice?: jest.Mock | undefined
-    sendCommand?: jest.Mock | undefined
-    onTelemetry?: jest.Mock | undefined
-    offTelemetry?: jest.Mock | undefined
+    setVolume?: Mock | undefined
+    setBluetoothPairedList?: Mock | undefined
+    connectBluetoothPairedDevice?: Mock | undefined
+    forgetBluetoothPairedDevice?: Mock | undefined
+    sendCommand?: Mock | undefined
+    onTelemetry?: Mock | undefined
+    offTelemetry?: Mock | undefined
   }
 }
 
 type TestProjectionApi = {
   settings: {
-    get: jest.Mock
-    save: jest.Mock
-    onUpdate: jest.Mock
+    get: Mock
+    save: Mock
+    onUpdate: Mock
   }
   usb: {
-    forceReset: jest.Mock
+    forceReset: Mock
   }
   ipc: {
-    setVolume: jest.Mock | undefined
-    setBluetoothPairedList: jest.Mock | undefined
-    connectBluetoothPairedDevice: jest.Mock | undefined
-    forgetBluetoothPairedDevice: jest.Mock | undefined
-    sendCommand: jest.Mock | undefined
-    onTelemetry: jest.Mock | undefined
-    offTelemetry: jest.Mock | undefined
+    setVolume: Mock | undefined
+    setBluetoothPairedList: Mock | undefined
+    connectBluetoothPairedDevice: Mock | undefined
+    forgetBluetoothPairedDevice: Mock | undefined
+    sendCommand: Mock | undefined
+    onTelemetry: Mock | undefined
+    offTelemetry: Mock | undefined
   }
 }
 
@@ -47,41 +48,41 @@ type TestWindow = Omit<Window, 'projection'> & {
 describe('store', () => {
   const makeProjectionApi = (overrides?: {
     settings?: Partial<{
-      get: jest.Mock
-      save: jest.Mock
-      onUpdate: jest.Mock
+      get: Mock
+      save: Mock
+      onUpdate: Mock
     }>
     usb?: Partial<{
-      forceReset: jest.Mock
+      forceReset: Mock
     }>
     ipc?: Partial<{
-      setVolume: jest.Mock | undefined
-      setBluetoothPairedList: jest.Mock | undefined
-      connectBluetoothPairedDevice: jest.Mock | undefined
-      forgetBluetoothPairedDevice: jest.Mock | undefined
-      sendCommand: jest.Mock | undefined
-      onTelemetry: jest.Mock | undefined
-      offTelemetry: jest.Mock | undefined
+      setVolume: Mock | undefined
+      setBluetoothPairedList: Mock | undefined
+      connectBluetoothPairedDevice: Mock | undefined
+      forgetBluetoothPairedDevice: Mock | undefined
+      sendCommand: Mock | undefined
+      onTelemetry: Mock | undefined
+      offTelemetry: Mock | undefined
     }>
   }) => ({
     settings: {
-      get: jest.fn(),
-      save: jest.fn(),
-      onUpdate: jest.fn(),
+      get: vi.fn(),
+      save: vi.fn(),
+      onUpdate: vi.fn(),
       ...(overrides?.settings ?? {})
     },
     usb: {
-      forceReset: jest.fn(),
+      forceReset: vi.fn(),
       ...(overrides?.usb ?? {})
     },
     ipc: {
-      setVolume: jest.fn(),
-      setBluetoothPairedList: jest.fn(),
-      connectBluetoothPairedDevice: jest.fn(),
-      forgetBluetoothPairedDevice: jest.fn(),
-      sendCommand: jest.fn(),
-      onTelemetry: jest.fn(),
-      offTelemetry: jest.fn(),
+      setVolume: vi.fn(),
+      setBluetoothPairedList: vi.fn(),
+      connectBluetoothPairedDevice: vi.fn(),
+      forgetBluetoothPairedDevice: vi.fn(),
+      sendCommand: vi.fn(),
+      onTelemetry: vi.fn(),
+      offTelemetry: vi.fn(),
       ...(overrides?.ipc ?? {})
     }
   })
@@ -102,8 +103,8 @@ describe('store', () => {
     }
   } as unknown as Config
 
-  const loadFreshStore = (projectionOverrides?: ProjectionApiOverrides) => {
-    jest.resetModules()
+  const loadFreshStore = async (projectionOverrides?: ProjectionApiOverrides) => {
+    vi.resetModules()
 
     const testWindow = window as unknown as TestWindow
     testWindow.projection = undefined
@@ -112,7 +113,7 @@ describe('store', () => {
       testWindow.projection = makeProjectionApi(projectionOverrides)
     }
 
-    return require('../store') as typeof import('../store')
+    return await import('../store')
   }
 
   const waitForStoreSettings = async (useLiviStore: {
@@ -125,8 +126,8 @@ describe('store', () => {
     throw new Error('store settings were not initialized')
   }
 
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     const testWindow = window as unknown as TestWindow
     testWindow.projection = undefined
   })
@@ -134,11 +135,11 @@ describe('store', () => {
   test('init loads settings from projection api and applies derived audio values', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -162,7 +163,7 @@ describe('store', () => {
   test('getSettings refreshes state from main settings api', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue({
+        get: vi.fn().mockResolvedValue({
           ...baseSettings,
           audioVolume: 0.2,
           navVolume: 0.3
@@ -170,7 +171,7 @@ describe('store', () => {
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().getSettings()
@@ -183,11 +184,11 @@ describe('store', () => {
   test('markRestartBaseline stores current settings as restart baseline', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -207,12 +208,12 @@ describe('store', () => {
   test('setDarkMode delegates to saveSettings without touching wire night mode', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        save: jest.fn().mockResolvedValue(undefined)
+        get: vi.fn().mockResolvedValue(baseSettings),
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().setDarkMode(true)
@@ -225,7 +226,7 @@ describe('store', () => {
   test('saveSettings updates store optimistically, persists patch and refreshes from main', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
@@ -234,11 +235,11 @@ describe('store', () => {
             micType: 2,
             nightMode: true
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -277,18 +278,18 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             dashboards: dashboardsOn
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -300,12 +301,12 @@ describe('store', () => {
   test('setAudioVolume/setNavVolume/setVoiceAssistantVolume/setCallVolume update state and persist', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        save: jest.fn().mockResolvedValue(undefined)
+        get: vi.fn().mockResolvedValue(baseSettings),
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -332,11 +333,11 @@ describe('store', () => {
   test('setBluetoothPairedList parses raw device list', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -355,11 +356,11 @@ describe('store', () => {
   test('buildBluetoothPairedListText reconstructs payload from devices', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -378,17 +379,17 @@ describe('store', () => {
   test('applyBluetoothPairedList sends list to ipc and triggers usb reset when restart is needed', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        setBluetoothPairedList: jest.fn().mockResolvedValue({ ok: true })
+        setBluetoothPairedList: vi.fn().mockResolvedValue({ ok: true })
       },
       usb: {
-        forceReset: jest.fn().mockResolvedValue(undefined)
+        forceReset: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -408,7 +409,7 @@ describe('store', () => {
   })
 
   test('applyBluetoothPairedList returns false when ipc api is missing', async () => {
-    const { useLiviStore } = loadFreshStore()
+    const { useLiviStore } = await loadFreshStore()
 
     const ok = await useLiviStore.getState().applyBluetoothPairedList()
     expect(ok).toBe(false)
@@ -417,11 +418,11 @@ describe('store', () => {
   test('setNegotiatedResolution, setDeviceInfo, setDongleInfo, setAudioInfo and setPcmData update store', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -466,11 +467,11 @@ describe('store', () => {
   test('resetInfo clears volatile info fields', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -510,17 +511,17 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        save: jest.fn().mockResolvedValue(undefined)
+        get: vi.fn().mockResolvedValue(baseSettings),
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        onTelemetry: jest.fn((handler) => {
+        onTelemetry: vi.fn((handler) => {
           telemetryHandler = handler
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -532,8 +533,8 @@ describe('store', () => {
     expect(projection.ipc.sendCommand).toHaveBeenCalledWith('enableNightMode')
   })
 
-  test('status store setters update status flags', () => {
-    const { useStatusStore } = loadFreshStore()
+  test('status store setters update status flags', async () => {
+    const { useStatusStore } = await loadFreshStore()
 
     useStatusStore.getState().setCameraFound(true)
     useStatusStore.getState().setDongleConnected(true)
@@ -553,16 +554,16 @@ describe('store', () => {
   })
 
   test('getSettings keeps defaults when projection settings api is missing', async () => {
-    const { useLiviStore } = loadFreshStore({
+    const { useLiviStore } = await loadFreshStore({
       ipc: {
-        setVolume: jest.fn(),
-        setBluetoothPairedList: jest.fn(),
-        sendCommand: jest.fn(),
-        onTelemetry: jest.fn(),
-        offTelemetry: jest.fn()
+        setVolume: vi.fn(),
+        setBluetoothPairedList: vi.fn(),
+        sendCommand: vi.fn(),
+        onTelemetry: vi.fn(),
+        offTelemetry: vi.fn()
       },
       usb: {
-        forceReset: jest.fn()
+        forceReset: vi.fn()
       }
     })
 
@@ -577,14 +578,14 @@ describe('store', () => {
   })
 
   test('getSettings swallows settings.get errors and keeps state stable', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockRejectedValue(new Error('get failed'))
+        get: vi.fn().mockRejectedValue(new Error('get failed'))
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await Promise.resolve()
     await Promise.resolve()
@@ -595,21 +596,21 @@ describe('store', () => {
   })
 
   test('saveSettings swallows settings.save errors after optimistic update', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             audioVolume: 0.12
           }),
-        save: jest.fn().mockRejectedValue(new Error('save failed'))
+        save: vi.fn().mockRejectedValue(new Error('save failed'))
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ audioVolume: 0.12 })
@@ -621,14 +622,14 @@ describe('store', () => {
   test('setAudioVolume clamps outgoing ipc volume to 0..1', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({ ...baseSettings, audioVolume: 2 })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ audioVolume: 2 })
@@ -639,14 +640,14 @@ describe('store', () => {
   test('setNavVolume clamps negative outgoing ipc volume to 0', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({ ...baseSettings, navVolume: -1 })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ navVolume: -1 })
@@ -657,18 +658,18 @@ describe('store', () => {
   test('saveSettings sends default mic command for unsupported mic type', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             micType: 99
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ micType: 99 as never })
@@ -679,15 +680,15 @@ describe('store', () => {
   test('saveSettings sends disableNightMode for false', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce({ ...baseSettings, nightMode: true })
           .mockResolvedValueOnce({ ...baseSettings, nightMode: false }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ nightMode: false })
@@ -696,17 +697,17 @@ describe('store', () => {
   })
 
   test('applyBluetoothPairedList returns false when ipc call throws', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        setBluetoothPairedList: jest.fn().mockRejectedValue(new Error('bt failed'))
+        setBluetoothPairedList: vi.fn().mockRejectedValue(new Error('bt failed'))
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -727,11 +728,11 @@ describe('store', () => {
   test('setDongleInfo keeps previous fw version when next fw version is blank', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -752,11 +753,11 @@ describe('store', () => {
   test('setDongleInfo accepts non-object boxInfo when no previous value exists and keeps existing non-object value', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -778,17 +779,17 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        save: jest.fn().mockResolvedValue(undefined)
+        get: vi.fn().mockResolvedValue(baseSettings),
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        onTelemetry: jest.fn((handler) => {
+        onTelemetry: vi.fn((handler) => {
           telemetryHandler = handler
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -800,23 +801,23 @@ describe('store', () => {
   })
 
   test('saveSettings swallows projection setVolume ipc errors', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({ ...baseSettings, audioVolume: 0.7 }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        setVolume: jest.fn(() => {
+        setVolume: vi.fn(() => {
           throw new Error('volume failed')
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ audioVolume: 0.7 })
@@ -825,23 +826,23 @@ describe('store', () => {
   })
 
   test('saveSettings swallows projection mic ipc errors', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({ ...baseSettings, micType: 1 }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        sendCommand: jest.fn(() => {
+        sendCommand: vi.fn(() => {
           throw new Error('mic failed')
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ micType: 1 })
@@ -850,23 +851,23 @@ describe('store', () => {
   })
 
   test('saveSettings swallows projection night mode ipc errors', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({ ...baseSettings, nightMode: true }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        sendCommand: jest.fn(() => {
+        sendCommand: vi.fn(() => {
           throw new Error('night failed')
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ nightMode: true })
@@ -879,15 +880,15 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        onUpdate: jest.fn((cb) => {
+        get: vi.fn().mockResolvedValue(baseSettings),
+        onUpdate: vi.fn((cb) => {
           onUpdateHandler = cb
           return () => {}
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -914,21 +915,21 @@ describe('store', () => {
   test('saveSettings does not send mic command when ipc.sendCommand is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             micType: 1
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
         sendCommand: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ micType: 1 })
@@ -939,21 +940,21 @@ describe('store', () => {
   test('saveSettings does not send night mode command when ipc.sendCommand is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             nightMode: true
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
         sendCommand: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ nightMode: true })
@@ -964,21 +965,21 @@ describe('store', () => {
   test('saveSettings does not send volume when ipc.setVolume is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest
+        get: vi
           .fn()
           .mockResolvedValueOnce(baseSettings)
           .mockResolvedValueOnce({
             ...baseSettings,
             audioVolume: 0.42
           }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
         setVolume: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ audioVolume: 0.42 })
@@ -989,17 +990,17 @@ describe('store', () => {
   test('applyBluetoothPairedList succeeds without usb reset when restart is not needed', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        setBluetoothPairedList: jest.fn().mockResolvedValue({ ok: true })
+        setBluetoothPairedList: vi.fn().mockResolvedValue({ ok: true })
       },
       usb: {
-        forceReset: jest.fn().mockResolvedValue(undefined)
+        forceReset: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1017,7 +1018,7 @@ describe('store', () => {
   })
 
   test('init keeps settings null when projection settings.get is missing', async () => {
-    const { useLiviStore } = loadFreshStore({
+    const { useLiviStore } = await loadFreshStore({
       settings: {
         get: undefined
       }
@@ -1032,7 +1033,7 @@ describe('store', () => {
   test('init applies fallback derived audio values when settings fields are missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue({
+        get: vi.fn().mockResolvedValue({
           ...baseSettings,
           audioVolume: undefined,
           navVolume: undefined,
@@ -1043,7 +1044,7 @@ describe('store', () => {
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1058,11 +1059,11 @@ describe('store', () => {
   test('init does nothing when called a second time', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1074,11 +1075,11 @@ describe('store', () => {
   test('setBluetoothPairedList ignores clearly invalid and empty bluetooth lines', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1105,13 +1106,13 @@ describe('store', () => {
   test('forgetBluetoothPairedDevice does not require restart when deleted device is not connected', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
+        forgetBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: true })
       }
     })
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1135,15 +1136,15 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        onUpdate: jest.fn((cb) => {
+        get: vi.fn().mockResolvedValue(baseSettings),
+        onUpdate: vi.fn((cb) => {
           onUpdateHandler = cb
           return () => {}
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1168,11 +1169,11 @@ describe('store', () => {
   test('setDeviceInfo normalizes blank usb firmware version to null', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1190,14 +1191,14 @@ describe('store', () => {
   test('forgetBluetoothPairedDevice preserves existing restart flag when already true', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
+        forgetBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: true })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1219,17 +1220,17 @@ describe('store', () => {
   test('applyBluetoothPairedList returns false when ipc responds with ok false', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        setBluetoothPairedList: jest.fn().mockResolvedValue({ ok: false })
+        setBluetoothPairedList: vi.fn().mockResolvedValue({ ok: false })
       },
       usb: {
-        forceReset: jest.fn().mockResolvedValue(undefined)
+        forceReset: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1250,11 +1251,11 @@ describe('store', () => {
   test('setDongleInfo replaces previous primitive boxInfo when next boxInfo is an object', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1272,11 +1273,11 @@ describe('store', () => {
   test('setBluetoothPairedList trims trailing null bytes from raw list', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1288,11 +1289,11 @@ describe('store', () => {
   test('getSettings returns early when settings api resolves null', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(null)
+        get: vi.fn().mockResolvedValue(null)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await Promise.resolve()
     await useLiviStore.getState().getSettings()
@@ -1307,15 +1308,15 @@ describe('store', () => {
   test('saveSettings persists and refreshes even when current settings are null', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue({
+        get: vi.fn().mockResolvedValue({
           ...baseSettings,
           audioVolume: 0.66
         }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     useLiviStore.setState({
       settings: null
@@ -1334,12 +1335,12 @@ describe('store', () => {
   test('init skips settings.onUpdate registration when handler is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
+        get: vi.fn().mockResolvedValue(baseSettings),
         onUpdate: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1349,14 +1350,14 @@ describe('store', () => {
   test('init skips telemetry registration when ipc.onTelemetry is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
         onTelemetry: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1366,14 +1367,14 @@ describe('store', () => {
   test('forgetBluetoothPairedDevice handles non-string btMacAddr without restart requirement', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
+        forgetBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: true })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1398,11 +1399,11 @@ describe('store', () => {
   test('setDongleInfo keeps previous object boxInfo when next boxInfo is primitive', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1418,7 +1419,7 @@ describe('store', () => {
   })
 
   test('connectBluetoothPairedDevice returns false when ipc api is missing', async () => {
-    const { useLiviStore } = loadFreshStore()
+    const { useLiviStore } = await loadFreshStore()
 
     const ok = await useLiviStore.getState().connectBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
 
@@ -1428,14 +1429,14 @@ describe('store', () => {
   test('connectBluetoothPairedDevice returns true when ipc responds with ok true', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        connectBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
+        connectBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: true })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1448,14 +1449,14 @@ describe('store', () => {
   test('connectBluetoothPairedDevice returns false when ipc responds with ok false', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        connectBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: false })
+        connectBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: false })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1466,17 +1467,17 @@ describe('store', () => {
   })
 
   test('connectBluetoothPairedDevice returns false and warns when ipc throws', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        connectBluetoothPairedDevice: jest.fn().mockRejectedValue(new Error('connect failed'))
+        connectBluetoothPairedDevice: vi.fn().mockRejectedValue(new Error('connect failed'))
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1490,17 +1491,17 @@ describe('store', () => {
   })
 
   test('forgetBluetoothPairedDevice returns false and warns when ipc throws', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockRejectedValue(new Error('forget failed'))
+        forgetBluetoothPairedDevice: vi.fn().mockRejectedValue(new Error('forget failed'))
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1513,8 +1514,8 @@ describe('store', () => {
     )
   })
 
-  test('markRestartBaseline does nothing when settings are null', () => {
-    const { useLiviStore } = loadFreshStore()
+  test('markRestartBaseline does nothing when settings are null', async () => {
+    const { useLiviStore } = await loadFreshStore()
 
     useLiviStore.setState({
       settings: null,
@@ -1531,17 +1532,17 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        save: jest.fn().mockResolvedValue(undefined)
+        get: vi.fn().mockResolvedValue(baseSettings),
+        save: vi.fn().mockResolvedValue(undefined)
       },
       ipc: {
-        onTelemetry: jest.fn((handler) => {
+        onTelemetry: vi.fn((handler) => {
           telemetryHandler = handler
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1553,7 +1554,7 @@ describe('store', () => {
   })
 
   test('forgetBluetoothPairedDevice returns false when ipc api is missing', async () => {
-    const { useLiviStore } = loadFreshStore()
+    const { useLiviStore } = await loadFreshStore()
 
     const ok = await useLiviStore.getState().forgetBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
 
@@ -1563,14 +1564,14 @@ describe('store', () => {
   test('forgetBluetoothPairedDevice returns false when ipc responds with ok false', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: false })
+        forgetBluetoothPairedDevice: vi.fn().mockResolvedValue({ ok: false })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1589,14 +1590,14 @@ describe('store', () => {
   test('forgetBluetoothPairedDevice treats non-object ipc response as success', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue(undefined)
+        forgetBluetoothPairedDevice: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1618,14 +1619,14 @@ describe('store', () => {
   test('connectBluetoothPairedDevice treats non-object ipc response as success', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        connectBluetoothPairedDevice: jest.fn().mockResolvedValue(undefined)
+        connectBluetoothPairedDevice: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1638,17 +1639,17 @@ describe('store', () => {
   test('applyBluetoothPairedList succeeds when restart is needed but usb api is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       },
       ipc: {
-        setBluetoothPairedList: jest.fn().mockResolvedValue({ ok: true })
+        setBluetoothPairedList: vi.fn().mockResolvedValue({ ok: true })
       },
       usb: {
         forceReset: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1667,12 +1668,12 @@ describe('store', () => {
   test('saveSettings returns after optimistic update when settings.save api is missing', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
+        get: vi.fn().mockResolvedValue(baseSettings),
         save: undefined
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
     await useLiviStore.getState().saveSettings({ audioVolume: 0.8 })
@@ -1690,15 +1691,15 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue({
+        get: vi.fn().mockResolvedValue({
           ...baseSettings,
           dashboards: dashboardsOff
         }),
-        save: jest.fn().mockResolvedValue(undefined)
+        save: vi.fn().mockResolvedValue(undefined)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     useLiviStore.setState({
       settings: null
@@ -1710,7 +1711,7 @@ describe('store', () => {
   })
 
   test('getSettings keeps defaults when projection api is completely missing', async () => {
-    const { useLiviStore } = loadFreshStore()
+    const { useLiviStore } = await loadFreshStore()
 
     await useLiviStore.getState().getSettings()
 
@@ -1722,13 +1723,13 @@ describe('store', () => {
   })
 
   test('actions handle missing projection api gracefully', async () => {
-    jest.resetModules()
+    vi.resetModules()
 
     const w = global.window as unknown as { projection?: unknown }
     const originalProjection = w.projection
     w.projection = undefined
 
-    const { useLiviStore } = require('../store') as typeof import('../store')
+    const { useLiviStore } = await import('../store')
 
     await expect(useLiviStore.getState().getSettings()).resolves.toBeUndefined()
     await expect(
@@ -1747,11 +1748,11 @@ describe('store', () => {
   test('setBluetoothPairedList handles undefined raw input', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1764,11 +1765,11 @@ describe('store', () => {
   test('buildBluetoothPairedListText falls back to empty string for missing device names', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1784,15 +1785,15 @@ describe('store', () => {
 
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings),
-        onUpdate: jest.fn((cb) => {
+        get: vi.fn().mockResolvedValue(baseSettings),
+        onUpdate: vi.fn((cb) => {
           onUpdateHandler = cb
           return () => {}
         })
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1814,11 +1815,11 @@ describe('store', () => {
   test('setDongleInfo replaces null boxInfo with incoming object', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1836,11 +1837,11 @@ describe('store', () => {
   test('setBluetoothPairedList normalizes undefined raw input to an empty string', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
 
@@ -1853,11 +1854,11 @@ describe('store', () => {
   test('removeBluetoothPairedDeviceLocal removes non-connected device without restart requirement', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useLiviStore.setState({
@@ -1882,11 +1883,11 @@ describe('store', () => {
   test('removeBluetoothPairedDeviceLocal marks restart required when connected device is removed', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useLiviStore.setState({
@@ -1911,11 +1912,11 @@ describe('store', () => {
   test('removeBluetoothPairedDeviceLocal preserves existing restart flag when already true', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useLiviStore.setState({
@@ -1940,11 +1941,11 @@ describe('store', () => {
   test('removeBluetoothPairedDeviceLocal handles non-string btMacAddr without restart requirement', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useLiviStore.setState({
@@ -1969,14 +1970,14 @@ describe('store', () => {
   test('telemetry handler forwards explicit reverse and lights to the status store', async () => {
     let telemetryHandler: ((payload: unknown) => void) | undefined
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
       ipc: {
-        onTelemetry: jest.fn((h) => {
+        onTelemetry: vi.fn((h) => {
           telemetryHandler = h
         })
       }
     })
-    const { useLiviStore, useStatusStore } = loadFreshStore(projection)
+    const { useLiviStore, useStatusStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     telemetryHandler?.({ reverse: true, lights: true })
@@ -1987,20 +1988,20 @@ describe('store', () => {
   test('telemetry handler skips no-op writes when reverse/lights already match', async () => {
     let telemetryHandler: ((payload: unknown) => void) | undefined
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
       ipc: {
-        onTelemetry: jest.fn((h) => {
+        onTelemetry: vi.fn((h) => {
           telemetryHandler = h
         })
       }
     })
-    const { useLiviStore, useStatusStore } = loadFreshStore(projection)
+    const { useLiviStore, useStatusStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useStatusStore.getState().setReverse(true)
     useStatusStore.getState().setLights(true)
-    const setReverseSpy = jest.spyOn(useStatusStore.getState(), 'setReverse')
-    const setLightsSpy = jest.spyOn(useStatusStore.getState(), 'setLights')
+    const setReverseSpy = vi.spyOn(useStatusStore.getState(), 'setReverse')
+    const setLightsSpy = vi.spyOn(useStatusStore.getState(), 'setLights')
 
     telemetryHandler?.({ reverse: true, lights: true })
     expect(setReverseSpy).not.toHaveBeenCalled()
@@ -2010,14 +2011,14 @@ describe('store', () => {
   test('telemetry handler derives reverse from gear "R" / -1 / numeric', async () => {
     let telemetryHandler: ((payload: unknown) => void) | undefined
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
       ipc: {
-        onTelemetry: jest.fn((h) => {
+        onTelemetry: vi.fn((h) => {
           telemetryHandler = h
         })
       }
     })
-    const { useLiviStore, useStatusStore } = loadFreshStore(projection)
+    const { useLiviStore, useStatusStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     telemetryHandler?.({ gear: 'R' })
@@ -2033,14 +2034,14 @@ describe('store', () => {
   test('telemetry handler ignores non-object payloads', async () => {
     let telemetryHandler: ((payload: unknown) => void) | undefined
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
       ipc: {
-        onTelemetry: jest.fn((h) => {
+        onTelemetry: vi.fn((h) => {
           telemetryHandler = h
         })
       }
     })
-    const { useLiviStore, useStatusStore } = loadFreshStore(projection)
+    const { useLiviStore, useStatusStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
     const before = { ...useStatusStore.getState() }
 
@@ -2053,19 +2054,19 @@ describe('store', () => {
   })
 
   test('telemetry hydration via getTelemetrySnapshot seeds the status store', async () => {
-    const getTelemetrySnapshot = jest.fn().mockResolvedValue({ reverse: true, lights: true })
+    const getTelemetrySnapshot = vi.fn().mockResolvedValue({ reverse: true, lights: true })
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
       ipc: {
-        onTelemetry: jest.fn()
+        onTelemetry: vi.fn()
         // Add the snapshot hook dynamically — makeProjectionApi doesn't include it.
       }
-    }) as unknown as TestProjectionApi & { ipc: { getTelemetrySnapshot: jest.Mock } }
+    }) as unknown as TestProjectionApi & { ipc: { getTelemetrySnapshot: Mock } }
     projection.ipc.getTelemetrySnapshot = getTelemetrySnapshot
     ;(window as unknown as { projection: TestProjectionApi }).projection = projection
 
-    jest.resetModules()
-    const { useLiviStore, useStatusStore } = require('../store') as typeof import('../store')
+    vi.resetModules()
+    const { useLiviStore, useStatusStore } = await import('../store')
     await waitForStoreSettings(useLiviStore)
     // Wait for the snapshot promise to resolve and applyTelemetryControls to run
     await Promise.resolve()
@@ -2077,16 +2078,16 @@ describe('store', () => {
   })
 
   test('telemetry hydration ignores an empty snapshot', async () => {
-    const getTelemetrySnapshot = jest.fn().mockResolvedValue({})
+    const getTelemetrySnapshot = vi.fn().mockResolvedValue({})
     const projection = makeProjectionApi({
-      settings: { get: jest.fn().mockResolvedValue(baseSettings) },
-      ipc: { onTelemetry: jest.fn() }
-    }) as unknown as TestProjectionApi & { ipc: { getTelemetrySnapshot: jest.Mock } }
+      settings: { get: vi.fn().mockResolvedValue(baseSettings) },
+      ipc: { onTelemetry: vi.fn() }
+    }) as unknown as TestProjectionApi & { ipc: { getTelemetrySnapshot: Mock } }
     projection.ipc.getTelemetrySnapshot = getTelemetrySnapshot
     ;(window as unknown as { projection: TestProjectionApi }).projection = projection
 
-    jest.resetModules()
-    const { useLiviStore, useStatusStore } = require('../store') as typeof import('../store')
+    vi.resetModules()
+    const { useLiviStore, useStatusStore } = await import('../store')
     await waitForStoreSettings(useLiviStore)
     await Promise.resolve()
     await Promise.resolve()
@@ -2097,8 +2098,8 @@ describe('store', () => {
     expect(useStatusStore.getState().lights).toBe(false)
   })
 
-  test('setAaActive flips the status flag and useProjectionActive reflects it', () => {
-    const { useStatusStore, useProjectionActive } = loadFreshStore()
+  test('setAaActive flips the status flag and useProjectionActive reflects it', async () => {
+    const { useStatusStore, useProjectionActive } = await loadFreshStore()
     useStatusStore.getState().setAaActive(true)
     expect(useStatusStore.getState().isAaActive).toBe(true)
     // useProjectionActive is a selector — call its underlying selector against the store
@@ -2112,11 +2113,11 @@ describe('store', () => {
   test('removeBluetoothPairedDeviceLocal works without boxInfo', async () => {
     const projection = makeProjectionApi({
       settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
+        get: vi.fn().mockResolvedValue(baseSettings)
       }
     })
 
-    const { useLiviStore } = loadFreshStore(projection)
+    const { useLiviStore } = await loadFreshStore(projection)
     await waitForStoreSettings(useLiviStore)
 
     useLiviStore.setState({

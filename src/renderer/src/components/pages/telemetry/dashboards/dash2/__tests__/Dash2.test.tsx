@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 
-jest.mock('../../../widgets', () => ({
+vi.mock('../../../widgets', () => ({
   NavFull: () => <div>NavFull</div>
 }))
 
-jest.mock('../../dash1/DashFrame', () => ({
+vi.mock('../../dash1/DashFrame', () => ({
   DashFrame: ({ clusterFull, children }: { clusterFull?: boolean; children?: ReactNode }) => (
     <div>
       <span>clusterFull:{clusterFull ? 'yes' : 'no'}</span>

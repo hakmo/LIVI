@@ -1,25 +1,25 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Camera } from '../Camera'
 
-const unsubscribeUsb = jest.fn()
-const listenForEvents = jest.fn(() => unsubscribeUsb)
-const setCameraFound = jest.fn()
+const unsubscribeUsb = vi.fn()
+const listenForEvents = vi.fn(() => unsubscribeUsb)
+const setCameraFound = vi.fn()
 
-const detectCameras = jest.fn().mockResolvedValue([
+const detectCameras = vi.fn().mockResolvedValue([
   { deviceId: 'cam-1', label: 'Front cam' },
   { deviceId: 'cam-2', label: 'Rear cam' }
 ])
 
-jest.mock('@utils/cameraDetection', () => ({
+vi.mock('@utils/cameraDetection', () => ({
   updateCameras: (...args: unknown[]) => detectCameras(...args)
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useStatusStore: (selector: (s: any) => unknown) => selector({ setCameraFound })
 }))
 
 describe('Settings Camera page', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     detectCameras.mockClear()
     setCameraFound.mockClear()
     ;(window as any).projection = {
@@ -33,7 +33,7 @@ describe('Settings Camera page', () => {
   })
 
   test('loads camera options and subscribes to usb events', async () => {
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     const { unmount } = render(<Camera state={{ cameraId: '' } as any} onChange={onChange} />)
 
     await waitFor(() => {
@@ -48,7 +48,7 @@ describe('Settings Camera page', () => {
 
   test('safeCameraPersist skips onChange when camera is already configured', async () => {
     // lines 26-27: if (state.cameraId && state.cameraId !== '') return early
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     render(<Camera state={{ cameraId: 'cam-1' } as any} onChange={onChange} />)
 
     await waitFor(() => expect(detectCameras).toHaveBeenCalled())
@@ -61,7 +61,7 @@ describe('Settings Camera page', () => {
 
   test('safeCameraPersist calls onChange when camera is not yet set', async () => {
     // lines 28-29: cameraId && onChange(cameraId)
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     render(<Camera state={{ cameraId: '' } as any} onChange={onChange} />)
 
     await waitFor(() => expect(detectCameras).toHaveBeenCalled())
@@ -73,7 +73,7 @@ describe('Settings Camera page', () => {
 
   test('safeCameraPersist accepts object with cameraId property', async () => {
     // line 27: cfgOrId?.cameraId branch
-    const onChange = jest.fn()
+    const onChange = vi.fn()
     render(<Camera state={{ cameraId: '' } as any} onChange={onChange} />)
 
     await waitFor(() => expect(detectCameras).toHaveBeenCalled())
@@ -85,7 +85,7 @@ describe('Settings Camera page', () => {
 
   test('USB attach event triggers camera re-detection', async () => {
     // lines 38-40: usbHandler fires detectCameras again on attach
-    render(<Camera state={{ cameraId: '' } as any} onChange={jest.fn()} />)
+    render(<Camera state={{ cameraId: '' } as any} onChange={vi.fn()} />)
 
     await waitFor(() => expect(listenForEvents).toHaveBeenCalled())
 
@@ -98,7 +98,7 @@ describe('Settings Camera page', () => {
 
   test('USB event with irrelevant type does not re-detect cameras', async () => {
     // line 39: type not in list → no detectCameras call
-    render(<Camera state={{ cameraId: '' } as any} onChange={jest.fn()} />)
+    render(<Camera state={{ cameraId: '' } as any} onChange={vi.fn()} />)
 
     await waitFor(() => expect(listenForEvents).toHaveBeenCalled())
 
@@ -113,7 +113,7 @@ describe('Settings Camera page', () => {
     // line 50: c.label || 'Camera'
     detectCameras.mockResolvedValueOnce([{ deviceId: 'cam-x', label: '' }])
     // set camera to cam-x so the Select shows the selected label
-    render(<Camera state={{ cameraId: 'cam-x' } as any} onChange={jest.fn()} />)
+    render(<Camera state={{ cameraId: 'cam-x' } as any} onChange={vi.fn()} />)
 
     await waitFor(() => {
       // MUI Select renders the selected option's label in the DOM
@@ -124,7 +124,7 @@ describe('Settings Camera page', () => {
   test('shows "No camera" option label when no cameras detected', async () => {
     // cameras.length === 0 → cameraOptions = [{deviceId:'', label:'No camera'}]
     detectCameras.mockResolvedValueOnce([])
-    render(<Camera state={{ cameraId: '' } as any} onChange={jest.fn()} />)
+    render(<Camera state={{ cameraId: '' } as any} onChange={vi.fn()} />)
 
     await waitFor(() => expect(detectCameras).toHaveBeenCalled())
 

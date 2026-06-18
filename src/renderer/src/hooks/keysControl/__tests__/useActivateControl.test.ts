@@ -11,7 +11,7 @@ describe('useActiveControl', () => {
     const { result } = renderHook(() => useActiveControl())
     const input = document.createElement('input')
     input.type = 'checkbox'
-    const click = jest.spyOn(input, 'click')
+    const click = vi.spyOn(input, 'click')
     expect(result.current(input)).toBe(true)
     expect(click).toHaveBeenCalled()
   })
@@ -21,7 +21,7 @@ describe('useActiveControl', () => {
     const el = document.createElement('div')
     el.setAttribute('role', 'combobox')
     el.setAttribute('aria-haspopup', 'listbox')
-    const dispatch = jest.spyOn(el, 'dispatchEvent')
+    const dispatch = vi.spyOn(el, 'dispatchEvent')
     expect(result.current(el)).toBe(true)
     expect(dispatch).toHaveBeenCalled()
   })
@@ -35,7 +35,7 @@ describe('useActiveControl', () => {
       configurable: true
     })
 
-    const dispatch = jest.spyOn(el, 'dispatchEvent')
+    const dispatch = vi.spyOn(el, 'dispatchEvent')
 
     expect(result.current(el)).toBe(true)
     expect(dispatch).toHaveBeenCalledTimes(1)
@@ -52,7 +52,7 @@ describe('useActiveControl', () => {
       configurable: true
     })
 
-    jest.spyOn(el, 'dispatchEvent').mockReturnValue(false)
+    vi.spyOn(el, 'dispatchEvent').mockReturnValue(false)
 
     expect(result.current(el)).toBe(false)
   })
@@ -64,7 +64,7 @@ describe('useActiveControl', () => {
     const child = document.createElement('span')
     button.appendChild(child)
 
-    const click = jest.spyOn(button, 'click')
+    const click = vi.spyOn(button, 'click')
 
     expect(result.current(child)).toBe(true)
     expect(click).toHaveBeenCalled()

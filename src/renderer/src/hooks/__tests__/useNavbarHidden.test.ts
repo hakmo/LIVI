@@ -8,9 +8,11 @@ describe('useNavbarHidden', () => {
     el.setAttribute('data-nav-hidden', '1')
     document.body.appendChild(el)
 
-    const observe = jest.fn()
-    const disconnect = jest.fn()
-    ;(global as any).MutationObserver = jest.fn(() => ({ observe, disconnect }))
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    ;(global as any).MutationObserver = vi.fn(function () {
+      return { observe, disconnect }
+    })
 
     const { result, unmount } = renderHook(() => useNavbarHidden())
     expect(result.current.isNavbarHidden).toBe(true)
@@ -26,8 +28,10 @@ describe('useNavbarHidden', () => {
   })
 
   test('handles missing content-root element', () => {
-    const disconnect = jest.fn()
-    ;(global as any).MutationObserver = jest.fn(() => ({ observe: jest.fn(), disconnect }))
+    const disconnect = vi.fn()
+    ;(global as any).MutationObserver = vi.fn(function () {
+      return { observe: vi.fn(), disconnect }
+    })
 
     const { result, unmount } = renderHook(() => useNavbarHidden())
 

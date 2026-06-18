@@ -1,41 +1,41 @@
-jest.mock('../camera', () => ({
+vi.mock('../camera', () => ({
   __esModule: true,
   Camera: 'CameraMock'
 }))
 
-jest.mock('../projection', () => ({
+vi.mock('../projection', () => ({
   __esModule: true,
   Projection: 'ProjectionMock'
 }))
 
-jest.mock('../home', () => ({
+vi.mock('../home', () => ({
   __esModule: true,
   Home: 'HomeMock'
 }))
 
-jest.mock('../cluster', () => ({
+vi.mock('../cluster', () => ({
   __esModule: true,
   Cluster: 'ClusterMock'
 }))
 
-jest.mock('../media', () => ({
+vi.mock('../media', () => ({
   __esModule: true,
   Media: 'MediaMock'
 }))
 
-jest.mock('../settings', () => ({
+vi.mock('../settings', () => ({
   __esModule: true,
   SettingsPage: 'SettingsPageMock'
 }))
 
-jest.mock('../telemetry', () => ({
+vi.mock('../telemetry', () => ({
   __esModule: true,
   Telemetry: 'TelemetryMock'
 }))
 
 describe('pages index', () => {
-  test('re-exports page modules', () => {
-    const mod = require('../index')
+  test('re-exports page modules', async () => {
+    const mod = await import('../index')
 
     expect(mod.Camera).toBe('CameraMock')
     expect(mod.Projection).toBe('ProjectionMock')

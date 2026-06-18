@@ -30,7 +30,7 @@ describe('useNetworkStatus', () => {
           addEventListener: (_: string, cb: () => void) => {
             changeCb = cb
           },
-          removeEventListener: jest.fn()
+          removeEventListener: vi.fn()
         }
       }
     })
@@ -49,7 +49,7 @@ describe('useNetworkStatus', () => {
           addEventListener: (_: string, cb: () => void) => {
             changeCb = cb
           },
-          removeEventListener: jest.fn()
+          removeEventListener: vi.fn()
         }
       }
     })
@@ -75,7 +75,7 @@ describe('useNetworkStatus', () => {
   })
 
   test('maps ethernet type and unregisters listeners on unmount', () => {
-    const removeConnectionListener = jest.fn()
+    const removeConnectionListener = vi.fn()
 
     Object.defineProperty(global, 'navigator', {
       configurable: true,
@@ -84,13 +84,13 @@ describe('useNetworkStatus', () => {
         connection: {
           type: 'ethernet',
           effectiveType: '5g',
-          addEventListener: jest.fn(),
+          addEventListener: vi.fn(),
           removeEventListener: removeConnectionListener
         }
       }
     })
 
-    const removeWindowListenerSpy = jest.spyOn(window, 'removeEventListener')
+    const removeWindowListenerSpy = vi.spyOn(window, 'removeEventListener')
 
     const { result, unmount } = renderHook(() => useNetworkStatus())
 
@@ -117,8 +117,8 @@ describe('useNetworkStatus', () => {
         connection: {
           type: 123,
           effectiveType: 456,
-          addEventListener: jest.fn(),
-          removeEventListener: jest.fn()
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn()
         }
       }
     })
@@ -140,8 +140,8 @@ describe('useNetworkStatus', () => {
         connection: {
           type: 'cellular',
           effectiveType: '4G',
-          addEventListener: jest.fn(),
-          removeEventListener: jest.fn()
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn()
         }
       }
     })
@@ -163,8 +163,8 @@ describe('useNetworkStatus', () => {
         connection: {
           type: 'bluetooth',
           effectiveType: '3G',
-          addEventListener: jest.fn(),
-          removeEventListener: jest.fn()
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn()
         }
       }
     })

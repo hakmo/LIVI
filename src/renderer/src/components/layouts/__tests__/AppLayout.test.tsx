@@ -6,35 +6,35 @@ let mockPathname = '/'
 let mockStreaming = false
 let mockHand = 0
 
-jest.mock('react-router', () => ({
+vi.mock('react-router', () => ({
   useLocation: () => ({ pathname: mockPathname })
 }))
 
-jest.mock('../../navigation', () => ({
+vi.mock('../../navigation', () => ({
   Nav: () => <div data-testid="nav">Nav</div>
 }))
 
 let mockTabCount = 4
-jest.mock('../../navigation/useTabsConfig', () => ({
+vi.mock('../../navigation/useTabsConfig', () => ({
   useTabsConfig: () =>
     Array.from({ length: mockTabCount }, (_, i) => ({ path: `/${i}`, label: `t${i}`, icon: null }))
 }))
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) => selector({ settings: { hand: mockHand } }),
   useStatusStore: (selector: (s: any) => unknown) => selector({ isStreaming: mockStreaming })
 }))
 
-jest.mock('../../../hooks/useBlinkingTime', () => ({
+vi.mock('../../../hooks/useBlinkingTime', () => ({
   useBlinkingTime: () => '12:34'
 }))
 
-jest.mock('../../../hooks/useNetworkStatus', () => ({
+vi.mock('../../../hooks/useNetworkStatus', () => ({
   useNetworkStatus: () => ({ type: 'wifi', online: true })
 }))
 
-jest.mock('@mui/material/styles', () => {
-  const actual = jest.requireActual('@mui/material/styles')
+vi.mock('@mui/material/styles', async () => {
+  const actual = await vi.importActual('@mui/material/styles')
   return {
     ...actual,
     useTheme: () => ({
@@ -44,20 +44,20 @@ jest.mock('@mui/material/styles', () => {
 })
 
 describe('AppLayout', () => {
-  beforeEach(() => {
-    jest.useFakeTimers()
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     mockPathname = '/'
     mockStreaming = false
     mockHand = 0
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
-    ;(window as any).app = { notifyUserActivity: jest.fn() }
+    ;(window as any).app = { notifyUserActivity: vi.fn() }
   })
 
-  afterEach(() => {
-    jest.useRealTimers()
+  afterEach(async () => {
+    vi.useRealTimers()
   })
 
-  test('hides nav on home when streaming', () => {
+  test('hides nav on home when streaming', async () => {
     mockStreaming = true
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
@@ -69,7 +69,7 @@ describe('AppLayout', () => {
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
   })
 
-  test('auto-hides nav after inactivity on maps', () => {
+  test('auto-hides nav after inactivity on maps', async () => {
     mockPathname = '/cluster'
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
@@ -81,12 +81,12 @@ describe('AppLayout', () => {
 
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
     act(() => {
-      jest.advanceTimersByTime(3000)
+      vi.advanceTimersByTime(3000)
     })
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
   })
 
-  test('forwards pointer activity to app notifier', () => {
+  test('forwards pointer activity to app notifier', async () => {
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
     const { container } = render(
@@ -98,7 +98,7 @@ describe('AppLayout', () => {
     expect((window as any).app.notifyUserActivity).toHaveBeenCalled()
   })
 
-  test('shows nav again and re-arms hide timer on mousemove in maps mode', () => {
+  test('shows nav again and re-arms hide timer on mousemove in maps mode', async () => {
     mockPathname = '/cluster'
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
@@ -110,7 +110,7 @@ describe('AppLayout', () => {
     )
 
     act(() => {
-      jest.advanceTimersByTime(3000)
+      vi.advanceTimersByTime(3000)
     })
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
 
@@ -119,12 +119,12 @@ describe('AppLayout', () => {
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
 
     act(() => {
-      jest.advanceTimersByTime(3000)
+      vi.advanceTimersByTime(3000)
     })
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
   })
 
-  test('shows nav again when focus moves into nav area on cluster page', () => {
+  test('shows nav again when focus moves into nav area on cluster page', async () => {
     mockPathname = '/cluster'
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
@@ -136,7 +136,7 @@ describe('AppLayout', () => {
     )
 
     act(() => {
-      jest.advanceTimersByTime(3000)
+      vi.advanceTimersByTime(3000)
     })
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
 
@@ -148,7 +148,7 @@ describe('AppLayout', () => {
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
   })
 
-  test('clears auto-hide timer and keeps nav visible when leaving auto-hide pages', () => {
+  test('clears auto-hide timer and keeps nav visible when leaving auto-hide pages', async () => {
     mockPathname = '/cluster'
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
@@ -169,19 +169,19 @@ describe('AppLayout', () => {
     )
 
     act(() => {
-      jest.advanceTimersByTime(3000)
+      vi.advanceTimersByTime(3000)
     })
 
     expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
   })
 
-  test('removes wake listeners on unmount for auto-hide pages', () => {
+  test('removes wake listeners on unmount for auto-hide pages', async () => {
     mockPathname = '/cluster'
     const navRef = createRef<HTMLDivElement>()
     const mainRef = createRef<HTMLDivElement>()
 
-    const windowRemoveSpy = jest.spyOn(window, 'removeEventListener')
-    const documentRemoveSpy = jest.spyOn(document, 'removeEventListener')
+    const windowRemoveSpy = vi.spyOn(window, 'removeEventListener')
+    const documentRemoveSpy = vi.spyOn(document, 'removeEventListener')
 
     const { unmount } = render(
       <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>

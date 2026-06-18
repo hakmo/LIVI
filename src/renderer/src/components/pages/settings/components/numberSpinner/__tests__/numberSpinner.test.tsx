@@ -1,11 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
+import type { Mock } from 'vitest'
 import { AppContext } from '../../../../../../context'
 import NumberSpinner from '../numberSpinner'
 
-const alphaMock = jest.fn((color: string, value: number) => `alpha(${color},${value})`)
+const alphaMock = vi.fn((color: string, value: number) => `alpha(${color},${value})`)
 
-jest.mock('@mui/material/styles', () => ({
+vi.mock('@mui/material/styles', () => ({
   useTheme: () => ({
     shape: { borderRadius: 8 },
     palette: {
@@ -18,7 +19,7 @@ jest.mock('@mui/material/styles', () => ({
   alpha: (color: string, value: number) => alphaMock(color, value)
 }))
 
-jest.mock('@mui/material/Box', () => ({
+vi.mock('@mui/material/Box', () => ({
   __esModule: true,
   default: React.forwardRef(function MockBox(
     props: React.HTMLAttributes<HTMLElement> & { component?: React.ElementType },
@@ -30,7 +31,7 @@ jest.mock('@mui/material/Box', () => ({
   })
 }))
 
-jest.mock('@mui/material/Button', () => ({
+vi.mock('@mui/material/Button', () => ({
   __esModule: true,
   default: ({
     children,
@@ -39,7 +40,7 @@ jest.mock('@mui/material/Button', () => ({
     React.createElement('button', { type: 'button', ...props }, children)
 }))
 
-jest.mock('@mui/material/FormControl', () => ({
+vi.mock('@mui/material/FormControl', () => ({
   __esModule: true,
   default: React.forwardRef(function MockFormControl(
     props: React.HTMLAttributes<HTMLDivElement>,
@@ -50,7 +51,7 @@ jest.mock('@mui/material/FormControl', () => ({
   })
 }))
 
-jest.mock('@mui/material/FormLabel', () => ({
+vi.mock('@mui/material/FormLabel', () => ({
   __esModule: true,
   default: ({
     children,
@@ -60,7 +61,7 @@ jest.mock('@mui/material/FormLabel', () => ({
     React.createElement('label', { htmlFor, ...props }, children)
 }))
 
-jest.mock('@mui/material/OutlinedInput', () => ({
+vi.mock('@mui/material/OutlinedInput', () => ({
   __esModule: true,
   default: ({
     inputRef,
@@ -103,23 +104,23 @@ jest.mock('@mui/material/OutlinedInput', () => ({
     })
 }))
 
-jest.mock('@mui/icons-material/Add', () => ({
+vi.mock('@mui/icons-material/Add', () => ({
   __esModule: true,
   default: () => React.createElement('span', null, '+')
 }))
 
-jest.mock('@mui/icons-material/Remove', () => ({
+vi.mock('@mui/icons-material/Remove', () => ({
   __esModule: true,
   default: () => React.createElement('span', null, '-')
 }))
 
-jest.mock('@mui/icons-material/OpenInFull', () => ({
+vi.mock('@mui/icons-material/OpenInFull', () => ({
   __esModule: true,
   default: () => React.createElement('span', null, 'scrub')
 }))
 
-jest.mock('@base-ui/react/number-field', () => {
-  const React = require('react')
+vi.mock('@base-ui/react/number-field', async () => {
+  const React = await import('react')
 
   const Root = ({
     children,
@@ -141,11 +142,11 @@ jest.mock('@base-ui/react/number-field', () => {
     render: (
       props: {
         ref: null
-        onBlur: jest.Mock
+        onBlur: Mock
         onChange: React.ChangeEventHandler<HTMLInputElement>
-        onKeyUp: jest.Mock
-        onKeyDown: jest.Mock
-        onFocus: jest.Mock
+        onKeyUp: Mock
+        onKeyDown: Mock
+        onFocus: Mock
       },
       state: { inputValue: string }
     ) => React.ReactNode
@@ -155,11 +156,11 @@ jest.mock('@base-ui/react/number-field', () => {
     return render(
       {
         ref: null,
-        onBlur: jest.fn(),
+        onBlur: vi.fn(),
         onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value),
-        onKeyUp: jest.fn(),
-        onKeyDown: jest.fn(),
-        onFocus: jest.fn()
+        onKeyUp: vi.fn(),
+        onKeyDown: vi.fn(),
+        onFocus: vi.fn()
       },
       { inputValue: value }
     )
@@ -220,11 +221,11 @@ describe('NumberSpinner', () => {
       </AppContext.Provider>
     )
 
-  beforeEach(() => {
+  beforeEach(async () => {
     alphaMock.mockClear()
   })
 
-  test('renders label, input and increment/decrement buttons', () => {
+  test('renders label, input and increment/decrement buttons', async () => {
     renderWithContext(
       <NumberSpinner label="Volume" min={0} max={100} value={42} onValueChange={() => {}} />
     )
@@ -235,7 +236,7 @@ describe('NumberSpinner', () => {
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 
-  test('uses provided id for label and input aria-label', () => {
+  test('uses provided id for label and input aria-label', async () => {
     renderWithContext(
       <NumberSpinner
         id="volume-spinner"
@@ -251,7 +252,7 @@ describe('NumberSpinner', () => {
     expect(input).toHaveAttribute('id', 'volume-spinner')
   })
 
-  test('renders scrub area when enableScrub is true', () => {
+  test('renders scrub area when enableScrub is true', async () => {
     renderWithContext(
       <NumberSpinner
         label="Scrubbable"
@@ -267,7 +268,7 @@ describe('NumberSpinner', () => {
     expect(screen.getByText('scrub')).toBeInTheDocument()
   })
 
-  test('marks input readonly when used as slider', () => {
+  test('marks input readonly when used as slider', async () => {
     renderWithContext(
       <NumberSpinner
         id="slider-spinner"
@@ -283,7 +284,7 @@ describe('NumberSpinner', () => {
     expect(screen.getByLabelText('slider-spinner')).toHaveAttribute('readonly')
   })
 
-  test('does not mark input readonly when not used as slider', () => {
+  test('does not mark input readonly when not used as slider', async () => {
     renderWithContext(
       <NumberSpinner
         id="normal-spinner"
@@ -298,7 +299,7 @@ describe('NumberSpinner', () => {
     expect(screen.getByLabelText('normal-spinner')).not.toHaveAttribute('readonly')
   })
 
-  test('shows armed color path when focused element id matches component id', () => {
+  test('shows armed color path when focused element id matches component id', async () => {
     renderWithContext(
       <NumberSpinner
         id="armed-spinner"
@@ -314,7 +315,7 @@ describe('NumberSpinner', () => {
     expect(screen.getByLabelText('armed-spinner')).toBeInTheDocument()
   })
 
-  test('calls alpha helper when slider overlay is rendered', () => {
+  test('calls alpha helper when slider overlay is rendered', async () => {
     renderWithContext(
       <NumberSpinner
         id="alpha-spinner"
@@ -330,7 +331,7 @@ describe('NumberSpinner', () => {
     expect(alphaMock).toHaveBeenCalledWith('#1976d2', 0.25)
   })
 
-  test('input value can change through mocked number field input change', () => {
+  test('input value can change through mocked number field input change', async () => {
     renderWithContext(
       <NumberSpinner
         id="editable-spinner"

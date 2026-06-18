@@ -1,26 +1,27 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { NavFull } from '../NavFull'
 
 let onEventCb: ((event: unknown, ...args: unknown[]) => void) | undefined
-let unsubscribeMock: jest.Mock
+let unsubscribeMock: Mock
 
-const useLiviStoreMock = jest.fn()
-const translateNavigationMock = jest.fn()
+const useLiviStoreMock = vi.fn()
+const translateNavigationMock = vi.fn()
 
-jest.mock('@store/store', () => ({
+vi.mock('@store/store', () => ({
   useLiviStore: (selector: (state: { settings: { language: string } }) => unknown) =>
     useLiviStoreMock(selector)
 }))
 
-jest.mock('@shared/utils/translateNavigation', () => ({
+vi.mock('@shared/utils/translateNavigation', () => ({
   translateNavigation: (...args: unknown[]) => translateNavigationMock(...args)
 }))
 
 describe('NavFull', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllMocks()
     onEventCb = undefined
-    unsubscribeMock = jest.fn()
+    unsubscribeMock = vi.fn()
 
     useLiviStoreMock.mockImplementation((selector: (state: any) => unknown) =>
       selector({
@@ -47,14 +48,14 @@ describe('NavFull', () => {
     }))
     ;(window as any).projection = {
       ipc: {
-        readNavigation: jest.fn().mockResolvedValue({
+        readNavigation: vi.fn().mockResolvedValue({
           payload: {
             navi: {
               NaviStatus: 0
             }
           }
         }),
-        onEvent: jest.fn((cb: (event: unknown, ...args: unknown[]) => void) => {
+        onEvent: vi.fn((cb: (event: unknown, ...args: unknown[]) => void) => {
           onEventCb = cb
           return unsubscribeMock
         })
@@ -73,7 +74,7 @@ describe('NavFull', () => {
   })
 
   test('hydrates navigation snapshot and renders active navigation content', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -98,7 +99,7 @@ describe('NavFull', () => {
   })
 
   test('passes normalized locale from settings into translateNavigation', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -124,7 +125,7 @@ describe('NavFull', () => {
         }
       })
     )
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -142,7 +143,7 @@ describe('NavFull', () => {
     expect(lastCall?.[1]).toBe('en')
   })
 
-  test('subscribes to projection events and unsubscribes on unmount', () => {
+  test('subscribes to projection events and unsubscribes on unmount', async () => {
     const { unmount } = render(<NavFull />)
 
     expect((window as any).projection.ipc.onEvent).toHaveBeenCalledTimes(1)
@@ -208,7 +209,7 @@ describe('NavFull', () => {
   })
 
   test('falls back to hydrate when navigation event patch cannot be unwrapped', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest
+    ;(window as any).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValueOnce({
         payload: {
@@ -250,7 +251,7 @@ describe('NavFull', () => {
   })
 
   test('renders maneuver image when NaviImageBase64 is present', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -278,7 +279,7 @@ describe('NavFull', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1,
@@ -294,7 +295,7 @@ describe('NavFull', () => {
   })
 
   test('keeps previous navigation state when hydrate throws', async () => {
-    ;(window as any).projection.ipc.readNavigation = jest
+    ;(window as any).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValueOnce({
         payload: {
@@ -341,7 +342,7 @@ describe('NavFull', () => {
         TurnSide: 2
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -370,7 +371,7 @@ describe('NavFull', () => {
         TurnSide: 0
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -399,7 +400,7 @@ describe('NavFull', () => {
         TurnSide: 1
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -428,7 +429,7 @@ describe('NavFull', () => {
         TurnSide: 1
       }
     }))
-    ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
+    ;(window as any).projection.ipc.readNavigation = vi.fn().mockResolvedValue({
       payload: {
         navi: {
           NaviStatus: 1
@@ -496,11 +497,8 @@ describe('NavFull', () => {
       SourceName: '',
       codes: { ManeuverType: code, TurnSide: 1 }
     }))
-    ;(
-      window as { projection: { ipc: { readNavigation: jest.Mock } } }
-    ).projection.ipc.readNavigation = jest
-      .fn()
-      .mockResolvedValue({ payload: { navi: { NaviStatus: 1 } } })
+    ;(window as { projection: { ipc: { readNavigation: Mock } } }).projection.ipc.readNavigation =
+      vi.fn().mockResolvedValue({ payload: { navi: { NaviStatus: 1 } } })
     render(<NavFull />)
     await waitFor(() => {
       expect(screen.getByTestId(iconTestId)).toBeInTheDocument()
@@ -509,8 +507,8 @@ describe('NavFull', () => {
 
   test('extracts navi from a top-level NaviStatus payload (no payload/navi wrappers)', async () => {
     ;(
-      window as { projection: { ipc: { readNavigation: jest.Mock; onEvent: jest.Mock } } }
-    ).projection.ipc.readNavigation = jest
+      window as { projection: { ipc: { readNavigation: Mock; onEvent: Mock } } }
+    ).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValue({ NaviStatus: 1, NaviManeuverType: 2, NaviTurnSide: 2 })
 
@@ -522,8 +520,8 @@ describe('NavFull', () => {
 
   test('live IPC update merges with hydrated navi', async () => {
     ;(
-      window as { projection: { ipc: { readNavigation: jest.Mock; onEvent: jest.Mock } } }
-    ).projection.ipc.readNavigation = jest
+      window as { projection: { ipc: { readNavigation: Mock; onEvent: Mock } } }
+    ).projection.ipc.readNavigation = vi
       .fn()
       .mockResolvedValue({ payload: { navi: { NaviStatus: 1, NaviManeuverType: 1 } } })
 

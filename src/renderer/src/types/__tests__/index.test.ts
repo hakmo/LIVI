@@ -1,21 +1,21 @@
-jest.mock('../dongle', () => ({
+vi.mock('../dongle', () => ({
   __esModule: true,
   DongleType: 'DongleTypeMock'
 }))
 
-jest.mock('../fw', () => ({
+vi.mock('../fw', () => ({
   __esModule: true,
   FirmwareType: 'FirmwareTypeMock'
 }))
 
-jest.mock('../ui', () => ({
+vi.mock('../ui', () => ({
   __esModule: true,
   UIType: 'UITypeMock'
 }))
 
 describe('types index', () => {
-  test('re-exports types modules', () => {
-    const mod = require('../index')
+  test('re-exports types modules', async () => {
+    const mod = await import('../index')
 
     expect(mod.DongleType).toBe('DongleTypeMock')
     expect(mod.FirmwareType).toBe('FirmwareTypeMock')

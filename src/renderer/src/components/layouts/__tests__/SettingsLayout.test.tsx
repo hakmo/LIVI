@@ -1,11 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { SettingsLayout } from '../SettingsLayout'
 
-const navigateMock = jest.fn()
+const navigateMock = vi.fn()
 let mockPathname = '/settings/system'
 
-jest.mock('react-router', () => {
-  const actual = jest.requireActual('react-router')
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router')
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -14,20 +14,20 @@ jest.mock('react-router', () => {
 })
 
 describe('SettingsLayout', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     navigateMock.mockReset()
     mockPathname = '/settings/system'
-    jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       cb(0)
       return 1
     })
   })
 
-  afterEach(() => {
-    jest.restoreAllMocks()
+  afterEach(async () => {
+    vi.restoreAllMocks()
   })
 
-  test('shows Back button outside root settings page and navigates back on click', () => {
+  test('shows Back button outside root settings page and navigates back on click', async () => {
     render(
       <SettingsLayout title="System" showRestart={false}>
         <div>Body</div>
@@ -45,7 +45,7 @@ describe('SettingsLayout', () => {
     expect(document.activeElement).not.toBe(input)
   })
 
-  test('hides Back button on root settings page', () => {
+  test('hides Back button on root settings page', async () => {
     mockPathname = '/settings'
     render(
       <SettingsLayout title="Settings" showRestart={false}>
@@ -56,8 +56,8 @@ describe('SettingsLayout', () => {
     expect(screen.queryByLabelText('Back')).toBeNull()
   })
 
-  test('renders Apply action and calls restart handler', () => {
-    const onRestart = jest.fn()
+  test('renders Apply action and calls restart handler', async () => {
+    const onRestart = vi.fn()
     render(
       <SettingsLayout title="System" showRestart onRestart={onRestart}>
         <div>Body</div>
@@ -68,7 +68,7 @@ describe('SettingsLayout', () => {
     expect(onRestart).toHaveBeenCalledTimes(1)
   })
 
-  test('blurs the active element before navigating back when it is not the body', () => {
+  test('blurs the active element before navigating back when it is not the body', async () => {
     render(
       <SettingsLayout title="System" showRestart={false}>
         <div>Body</div>
@@ -78,7 +78,7 @@ describe('SettingsLayout', () => {
     const input = document.createElement('input')
     document.body.appendChild(input)
 
-    const blurSpy = jest.spyOn(input, 'blur')
+    const blurSpy = vi.spyOn(input, 'blur')
     input.focus()
 
     fireEvent.click(screen.getByLabelText('Back'))
@@ -87,14 +87,14 @@ describe('SettingsLayout', () => {
     expect(navigateMock).toHaveBeenCalledWith(-1)
   })
 
-  test('does not blur when the active element is the body', () => {
+  test('does not blur when the active element is the body', async () => {
     render(
       <SettingsLayout title="System" showRestart={false}>
         <div>Body</div>
       </SettingsLayout>
     )
 
-    const blurSpy = jest.spyOn(document.body, 'blur')
+    const blurSpy = vi.spyOn(document.body, 'blur')
     document.body.focus()
 
     fireEvent.click(screen.getByLabelText('Back'))

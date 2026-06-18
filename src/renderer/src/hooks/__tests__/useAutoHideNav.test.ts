@@ -1,15 +1,15 @@
 import { act, renderHook } from '@testing-library/react'
 import { useAutoHideNav } from '../useAutoHideNav'
 
-jest.mock('../../constants', () => ({
+vi.mock('../../constants', () => ({
   UI: { INACTIVITY_HIDE_DELAY_MS: 1000 }
 }))
 
 beforeEach(() => {
-  jest.useFakeTimers()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
 })
 afterEach(() => {
-  jest.useRealTimers()
+  vi.useRealTimers()
 })
 
 describe('useAutoHideNav', () => {
@@ -17,7 +17,7 @@ describe('useAutoHideNav', () => {
     const { result } = renderHook(() => useAutoHideNav(false))
     expect(result.current.hidden).toBe(false)
     act(() => {
-      jest.advanceTimersByTime(5_000)
+      vi.advanceTimersByTime(5_000)
     })
     expect(result.current.hidden).toBe(false)
   })
@@ -26,7 +26,7 @@ describe('useAutoHideNav', () => {
     const { result } = renderHook(() => useAutoHideNav(true))
     expect(result.current.hidden).toBe(false)
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
   })
@@ -34,7 +34,7 @@ describe('useAutoHideNav', () => {
   test('wake() re-shows and re-schedules the hide', () => {
     const { result } = renderHook(() => useAutoHideNav(true))
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
     act(() => {
@@ -42,7 +42,7 @@ describe('useAutoHideNav', () => {
     })
     expect(result.current.hidden).toBe(false)
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
   })
@@ -50,7 +50,7 @@ describe('useAutoHideNav', () => {
   test('input activity (mousemove / keydown / wheel) wakes the nav', () => {
     const { result } = renderHook(() => useAutoHideNav(true))
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
     act(() => {
@@ -58,7 +58,7 @@ describe('useAutoHideNav', () => {
     })
     expect(result.current.hidden).toBe(false)
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
     act(() => {
@@ -66,7 +66,7 @@ describe('useAutoHideNav', () => {
     })
     expect(result.current.hidden).toBe(false)
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
     act(() => {
@@ -78,7 +78,7 @@ describe('useAutoHideNav', () => {
   test('focusin without containerEl wakes', () => {
     const { result } = renderHook(() => useAutoHideNav(true))
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
     act(() => {
@@ -98,7 +98,7 @@ describe('useAutoHideNav', () => {
 
     const { result } = renderHook(() => useAutoHideNav(true, container))
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
 
@@ -125,7 +125,7 @@ describe('useAutoHideNav', () => {
       initialProps: { on: true }
     })
     act(() => {
-      jest.advanceTimersByTime(1_000)
+      vi.advanceTimersByTime(1_000)
     })
     expect(result.current.hidden).toBe(true)
 
@@ -135,7 +135,7 @@ describe('useAutoHideNav', () => {
     // mousemove now should no longer fire wake (already false, but importantly no errors and no schedule)
     act(() => {
       document.dispatchEvent(new MouseEvent('mousemove'))
-      jest.advanceTimersByTime(5_000)
+      vi.advanceTimersByTime(5_000)
     })
     expect(result.current.hidden).toBe(false)
   })
@@ -143,11 +143,11 @@ describe('useAutoHideNav', () => {
   test('unmount clears timers and listeners', () => {
     const { result, unmount } = renderHook(() => useAutoHideNav(true))
     act(() => {
-      jest.advanceTimersByTime(500)
+      vi.advanceTimersByTime(500)
     })
     unmount()
     act(() => {
-      jest.advanceTimersByTime(2_000)
+      vi.advanceTimersByTime(2_000)
     })
     // Hook is gone — `hidden` reflects the last render, which was still false
     expect(result.current.hidden).toBe(false)

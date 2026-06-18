@@ -6,14 +6,14 @@ const smartResult = {
   isDirty: false,
   needsRestart: false,
   isDongleConnected: true,
-  handleFieldChange: jest.fn(),
-  resetState: jest.fn(),
-  restart: jest.fn(),
-  requestRestart: jest.fn()
+  handleFieldChange: vi.fn(),
+  resetState: vi.fn(),
+  restart: vi.fn(),
+  requestRestart: vi.fn()
 }
 
-jest.mock('../useSmartSettings', () => ({
-  useSmartSettings: jest.fn(() => smartResult)
+vi.mock('../useSmartSettings', () => ({
+  useSmartSettings: vi.fn(() => smartResult)
 }))
 
 describe('useSmartSettingsFromSchema', () => {

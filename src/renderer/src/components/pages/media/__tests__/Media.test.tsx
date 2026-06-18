@@ -1,19 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { Mock } from 'vitest'
 import { Media } from '../Media'
 
-jest.mock('../components/createFFTSpectrum', () => ({
+vi.mock('../components/createFFTSpectrum', () => ({
   FFTSpectrum: () => null
 }))
 
-jest.mock('./../hooks/useBelowNavTop', () => ({
+vi.mock('./../hooks/useBelowNavTop', () => ({
   useBelowNavTop: () => 0
 }))
 
-jest.mock('./../hooks/useElementSize', () => ({
+vi.mock('./../hooks/useElementSize', () => ({
   useElementSize: () => [{ current: null }, { w: 600, h: 400 }]
 }))
 
-jest.mock('./../hooks/useMediaState', () => ({
+vi.mock('./../hooks/useMediaState', () => ({
   useMediaState: () => ({
     snap: {
       payload: {
@@ -34,41 +35,41 @@ jest.mock('./../hooks/useMediaState', () => ({
 let usbEventCb: ((_: unknown, ...args: unknown[]) => void) | undefined
 
 describe('Media component', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     // — expand the global window
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     window.projection = {
-      ipc: { sendCommand: jest.fn(), setVisualizerEnabled: jest.fn() },
+      ipc: { sendCommand: vi.fn(), setVisualizerEnabled: vi.fn() },
       usb: {
-        listenForEvents: jest.fn(() => jest.fn())
+        listenForEvents: vi.fn(() => vi.fn())
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     } as unknown as typeof window.projection
   })
 
-  beforeEach(() => {
+  beforeEach(async () => {
     usbEventCb = undefined
-    jest.useFakeTimers()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     // — expand the global window
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     window.projection = {
       ipc: {
-        sendCommand: jest.fn(),
-        setVisualizerEnabled: jest.fn()
+        sendCommand: vi.fn(),
+        setVisualizerEnabled: vi.fn()
       },
       usb: {
-        listenForEvents: jest.fn((cb: any) => {
+        listenForEvents: vi.fn((cb: any) => {
           usbEventCb = cb
-          return jest.fn()
+          return vi.fn()
         })
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     } as unknown as typeof window.projection
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-    jest.useRealTimers()
+  afterEach(async () => {
+    vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('sends play/pause command and resets press feedback', async () => {
@@ -85,13 +86,13 @@ describe('Media component', () => {
 
     // advance timers for reset
     await act(async () => {
-      jest.advanceTimersByTime(150)
+      vi.advanceTimersByTime(150)
     })
 
     // simulate second click (pause)
     await act(async () => {
       fireEvent.click(playButton)
-      jest.advanceTimersByTime(150)
+      vi.advanceTimersByTime(150)
     })
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -112,10 +113,10 @@ describe('Media component', () => {
     expect(window.projection.ipc.sendCommand).toHaveBeenCalledWith('prev')
   })
 
-  it('cleans up USB listeners on unmount', () => {
-    const unsub = jest.fn()
+  it('cleans up USB listeners on unmount', async () => {
+    const unsub = vi.fn()
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    ;(window.projection.usb.listenForEvents as jest.Mock).mockImplementationOnce(() => unsub)
+    ;(window.projection.usb.listenForEvents as Mock).mockImplementationOnce(() => unsub)
 
     const { unmount } = render(<Media />)
     unmount()

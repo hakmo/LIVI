@@ -1,4 +1,4 @@
-jest.mock('@renderer/components/pages/settings/SettingsPage', () => ({
+vi.mock('@renderer/components/pages/settings/SettingsPage', () => ({
   SettingsPage: () => null
 }))
 

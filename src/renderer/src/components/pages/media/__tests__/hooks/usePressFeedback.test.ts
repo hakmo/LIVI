@@ -2,15 +2,15 @@ import { act, renderHook } from '@testing-library/react'
 import { usePressFeedback } from '../../hooks'
 import { MediaEventType } from '../../types'
 
-jest.useFakeTimers()
+vi.useFakeTimers({ shouldAdvanceTime: true })
 
 describe('usePressFeedback', () => {
-  beforeEach(() => {
-    jest.clearAllTimers()
-    jest.clearAllMocks()
+  beforeEach(async () => {
+    vi.clearAllTimers()
+    vi.clearAllMocks()
   })
 
-  it('initially has all press states false', () => {
+  it('initially has all press states false', async () => {
     const { result } = renderHook(() => usePressFeedback())
     expect(result.current.press).toEqual({
       play: false,
@@ -32,13 +32,13 @@ describe('usePressFeedback', () => {
     expect(result.current.press.play).toBe(true)
 
     await act(async () => {
-      jest.advanceTimersByTime(140)
+      vi.advanceTimersByTime(140)
     })
 
     expect(result.current.press.play).toBe(false)
   })
 
-  it('resets all press states immediately when reset is called', () => {
+  it('resets all press states immediately when reset is called', async () => {
     const { result } = renderHook(() => usePressFeedback())
 
     act(() => {
@@ -71,7 +71,7 @@ describe('usePressFeedback', () => {
 
   it('clears previous timer when bump is called again for the same key', async () => {
     const { result } = renderHook(() => usePressFeedback())
-    const clearSpy = jest.spyOn(window, 'clearTimeout')
+    const clearSpy = vi.spyOn(window, 'clearTimeout')
 
     act(() => {
       result.current.bump(MediaEventType.PLAY, 200)
