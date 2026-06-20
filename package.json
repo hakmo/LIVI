@@ -1,6 +1,6 @@
 {
   "name": "LIVI",
-  "version": "7.1.2",
+  "version": "7.2.0",
   "description": "LIVI - Linux In-Vehicle Infotainment",
   "desktopName": "dev.f-io.livi.desktop",
   "main": "./out/main/main.js",
