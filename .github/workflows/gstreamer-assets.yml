@@ -558,7 +558,19 @@ jobs:
             fi
             ver=""
             [[ -f "$dir/version.txt" ]] && ver="$(cat "$dir/version.txt")"
-            if [[ -n "$ver" ]]; then
+
+            # For Linux, show which Debian package(s) actually changed.
+            detail=""
+            if [[ "$plat" == linux-* && -f "$dir/packages.txt" ]]; then
+              old="$(git show "HEAD:$dir/packages.txt" 2>/dev/null || true)"
+              if [[ -n "$old" ]]; then
+                detail="$(comm -13 <(printf '%s\n' "$old" | sort -u) <(sort -u "$dir/packages.txt") | paste -sd', ' -)"
+              fi
+            fi
+
+            if [[ -n "$detail" ]]; then
+              git commit -m "chore(gstreamer): update ${plat} bundle (${detail})"
+            elif [[ -n "$ver" ]]; then
               git commit -m "chore(gstreamer): update ${plat} bundle to ${ver}"
             else
               git commit -m "chore(gstreamer): update ${plat} bundle"
