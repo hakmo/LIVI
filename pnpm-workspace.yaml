@@ -11,3 +11,11 @@ allowBuilds:
   protobufjs: true
   unrs-resolver: true
 minimumReleaseAge: 0
+supportedArchitectures:
+  os:
+    - current
+    - darwin
+  cpu:
+    - current
+    - x64
+    - arm64

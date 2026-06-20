@@ -5,7 +5,7 @@ import path from 'path'
 function platformDir(): string | null {
   switch (process.platform) {
     case 'darwin':
-      return process.arch === 'arm64' ? 'macos-arm64' : null
+      return 'macos-arm64'
     case 'linux':
       return process.arch === 'arm64' ? 'linux-arm64' : process.arch === 'x64' ? 'linux-x64' : null
     case 'win32':
