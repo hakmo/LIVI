@@ -10,14 +10,18 @@ import { phoneVendorIdsFromUdevTemplate } from './udevRule'
 
 type Device = USBDevice
 
-// Device classes that are never a wired-AA phone, so they never trigger a bring-up.
-const NON_PHONE_DEVICE_CLASSES = new Set<number>([
-  0x03, // HID (keyboard, mouse, gamepad)
+// A class-0x00 device whose interfaces are all in this set is not a phone.
+const NON_PHONE_INTERFACE_CLASSES = new Set<number>([
+  0x01, // Audio
+  0x02, // Communications
+  0x03, // HID
   0x07, // Printer
-  0x08, // Mass Storage (USB stick)
+  0x08, // Mass Storage
   0x09, // Hub
-  0x0e, // Video (UVC webcam)
-  0x11 // Billboard (USB-C alt-mode advertising)
+  0x0a, // CDC-Data
+  0x0b, // Smart Card
+  0x0e, // Video
+  0xe0 // Wireless
 ])
 
 // Suppress detach/attach noise during the AOAP handshake cycle
@@ -218,14 +222,20 @@ export class USBService {
     if (this.isDongle(device)) return false
     const cls = device.deviceClass
     if (cls === undefined) return false
-    if (NON_PHONE_DEVICE_CLASSES.has(cls)) return false
     if (cls !== 0x00 && cls !== 0xff) return false
+    if (this.hasOnlyNonPhoneInterfaces(device)) return false
     // Linux: only probe vendors the udev rules grant access to
     if (process.platform === 'linux') {
       const vendors = phoneVendorIdsFromUdevTemplate()
       if (vendors && device.vendorId !== undefined && !vendors.has(device.vendorId)) return false
     }
     return true
+  }
+
+  private hasOnlyNonPhoneInterfaces(device: Device): boolean {
+    const ifaces = device.configuration?.interfaces ?? []
+    if (ifaces.length === 0) return false
+    return ifaces.every((i) => NON_PHONE_INTERFACE_CLASSES.has(i.alternate.interfaceClass))
   }
 
   private isSamePhoneDevice(device: Device): boolean {
