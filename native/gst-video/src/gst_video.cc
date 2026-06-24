@@ -183,41 +183,6 @@ static GstPadProbeReturn colorimetry_fixup_probe(GstPad*, GstPadProbeInfo* info,
   return GST_PAD_PROBE_OK;
 }
 
-// Add GstVideoMeta to the decoder's ALLOCATION query. The Pi v4l2codecs decoder only
-// zero-copies a cropped frame (1080p coded at 1088) when downstream advertises VideoMeta,
-// which waylandsink does not. Never add a buffer pool here, it can't describe DMA_DRM and
-// crashes the decoder. 720p needs no crop and zero-copies regardless.
-static GstPadProbeReturn alloc_meta_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
-  GstQuery* query = GST_PAD_PROBE_INFO_QUERY(info);
-  if (query && GST_QUERY_TYPE(query) == GST_QUERY_ALLOCATION) {
-    gboolean had = gst_query_find_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
-    if (!had) gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
-    fprintf(stderr, "[gst_video] ALLOC query: had_videometa=%d added=%d\n", had, !had);
-  }
-  return GST_PAD_PROBE_OK;
-}
-
-// DIAGNOSTIC (temporary)
-static GstPadProbeReturn buffer_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
-  GstBuffer* buf = GST_PAD_PROBE_INFO_BUFFER(info);
-  if (!buf) return GST_PAD_PROBE_OK;
-  guint n = gst_buffer_n_memory(buf);
-  fprintf(stderr, "[gst_video] sink buffer: n_memory=%u size=%" G_GSIZE_FORMAT "\n",
-    n, gst_buffer_get_size(buf));
-  for (guint i = 0; i < n; i++) {
-    GstMemory* m = gst_buffer_peek_memory(buf, i);
-    fprintf(stderr, "[gst_video]   mem[%u] alloc=%s\n", i,
-      (m && m->allocator && m->allocator->mem_type) ? m->allocator->mem_type : "(null)");
-  }
-  GstVideoMeta* vm = gst_buffer_get_video_meta(buf);
-  if (vm)
-    fprintf(stderr, "[gst_video]   videometa n_planes=%u stride0=%d offset1=%" G_GSIZE_FORMAT "\n",
-      vm->n_planes, (int)vm->stride[0], vm->n_planes > 1 ? vm->offset[1] : (gsize)0);
-  else
-    fprintf(stderr, "[gst_video]   videometa: NONE\n");
-  return GST_PAD_PROBE_REMOVE;
-}
-
 static void remove_video_view(Player* p) {
   if (p->view) {
     livi_remove_view(p->view);
@@ -438,13 +403,6 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
     GstPad* sp = gst_element_get_static_pad(dec, "src");
     if (sp) {
       gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, caps_probe, NULL, NULL);
-      // The alloc-meta probe sits on the decoder's peer pad (the post-decoder queue), because
-      // the decoder queries that peer in decide_allocation and the queue doesn't forward it.
-      GstPad* peer = gst_pad_get_peer(sp);
-      if (peer) {
-        gst_pad_add_probe(peer, GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, alloc_meta_probe, NULL, NULL);
-        gst_object_unref(peer);
-      }
       gst_object_unref(sp);
     }
     GstPad* dsp = gst_element_get_static_pad(dec, "sink");
@@ -459,15 +417,6 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
       gst_object_unref(dsp);
     }
     gst_object_unref(dec);
-  }
-
-  if (p->sink) {
-    GstPad* sp = gst_element_get_static_pad(p->sink, "sink");
-    if (sp) {
-      // DIAGNOSTIC (temporary): inspect the first buffer the sink receives.
-      gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_BUFFER, buffer_probe, NULL, NULL);
-      gst_object_unref(sp);
-    }
   }
 
   GstBus* bus = gst_element_get_bus(pipeline);
