@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
-# Install the LIVI Plymouth boot splash on Raspberry Pi OS.
+# Install the LIVI (or other)Plymouth boot splash on Raspberry Pi OS.
+# Usage:
+#   sudo ./install.sh [theme-name]
+# If theme-name is not provided, it defaults to 'livi' and looks for 'livi-splash.png' in the script directory.
+# If theme-name is provided, it looks for the subdirectory named after the theme; there it will look for `<theme-name>-splash.png`
+#  for static boot image or `progress-N.png` frames for animated boot images.
 # Run as root (or via sudo) on the Pi
 set -euo pipefail
 
-THEME_NAME="livi"
+THEME_NAME="${1:-livi}"
 THEME_DIR="/usr/share/plymouth/themes/${THEME_NAME}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOGO_SRC="${SCRIPT_DIR}/livi-splash.png"
+
+FRAME_COUNT=0
+if [[ $# -gt 0 ]]; then
+  for f in "${SCRIPT_DIR}/${THEME_NAME}"/progress-[0-9]*.png; do
+    if [[ -f "$f" ]]; then
+      FRAME_COUNT=$(( FRAME_COUNT + 1 ))
+    fi
+  done
+fi
+
+if [[ $# -gt 0 && ${FRAME_COUNT} -eq 0 ]]; then
+  LOGO_SRC="${SCRIPT_DIR}/${THEME_NAME}/${THEME_NAME}-splash.png"
+elif [[ $# -eq 0 ]]; then
+  LOGO_SRC="${SCRIPT_DIR}/livi-splash.png"
+else
+  LOGO_SRC=""
+fi
 
 CONFIG_TXT=""
 CMDLINE_TXT=""
@@ -16,9 +37,9 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f "${LOGO_SRC}" ]]; then
+if [[ ${FRAME_COUNT} -eq 0 && ! -f "${LOGO_SRC}" ]]; then
   echo "Missing ${LOGO_SRC}" >&2
-  echo "Place a transparent-background PNG." >&2
+  echo "Place a transparent-background PNG or progress-N.png animation frames." >&2
   exit 1
 fi
 
@@ -35,7 +56,16 @@ apt-get install -y plymouth plymouth-themes
 
 echo "[2/5] Writing theme to ${THEME_DIR}"
 install -d -m 0755 "${THEME_DIR}"
-install -m 0644 "${LOGO_SRC}" "${THEME_DIR}/logo.png"
+if [[ ${FRAME_COUNT} -gt 0 ]]; then
+  echo "      animated: ${FRAME_COUNT} frames"
+  for f in "${SCRIPT_DIR}/${THEME_NAME}"/progress-[0-9]*.png; do
+    if [[ -f "$f" ]]; then
+      install -m 0644 "$f" "${THEME_DIR}/"
+    fi
+  done
+else
+  install -m 0644 "${LOGO_SRC}" "${THEME_DIR}/logo.png"
+fi
 
 cat > "${THEME_DIR}/${THEME_NAME}.plymouth" <<EOF
 [Plymouth Theme]
@@ -48,6 +78,26 @@ ImageDir=${THEME_DIR}
 ScriptFile=${THEME_DIR}/${THEME_NAME}.script
 EOF
 
+if [[ ${FRAME_COUNT} -gt 0 ]]; then
+cat > "${THEME_DIR}/${THEME_NAME}.script" <<EOF
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+for (i = 1; i <= ${FRAME_COUNT}; i++)
+  frames[i] = Image("progress-" + i + ".png");
+
+sprite = Sprite();
+sprite.SetX(Window.GetX() + (Window.GetWidth(0) / 2 - frames[1].GetWidth() / 2));
+sprite.SetY(Window.GetY() + (Window.GetHeight(0) / 2 - frames[1].GetHeight() / 2));
+
+tick = 0;
+fun refresh_callback() {
+  sprite.SetImage(frames[Math.Int(tick / 2) % ${FRAME_COUNT} + 1]);
+  tick++;
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+EOF
+else
 cat > "${THEME_DIR}/${THEME_NAME}.script" <<'EOF'
 Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
@@ -64,6 +114,7 @@ fun refresh() {
 }
 Plymouth.SetRefreshFunction(refresh);
 EOF
+fi
 
 echo "[3/5] Activating theme + rebuilding initramfs"
 plymouth-set-default-theme "${THEME_NAME}" -R
